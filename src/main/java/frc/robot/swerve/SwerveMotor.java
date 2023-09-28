@@ -11,7 +11,7 @@ public interface SwerveMotor {
     public double getPosition();
     public double getVelocity();
 
-    public class CANSparkMaxSwerveMotor implements SwerveMotor {
+    public static class CANSparkMaxSwerveMotor implements SwerveMotor {
         private CANSparkMax motor;
 
         public CANSparkMaxSwerveMotor(int id, boolean reversed) {
