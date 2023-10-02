@@ -23,8 +23,10 @@ import frc.robot.swerve.SwerveMotor;
 public class SwerveDriveSubsystem extends SubsystemBase {
   private SwerveDrive swerveDrive;
   private XboxController controller;
+  private Rotation2d heading;
   /** Creates a new ExampleSubsystem. */
   public SwerveDriveSubsystem() {
+    this.heading = new Rotation2d();
     PIDController pivotController = new PIDController(0.15, 0, 0.0);
     PIDController driveController = new PIDController(0.001, 0, 0);
     this.swerveDrive = new SwerveDrive(
@@ -80,18 +82,14 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
+    this.heading = this.heading.plus(Rotation2d.fromRotations(MathUtil.applyDeadband(this.controller.getRightX(), 0.1)*0.01));
     this.swerveDrive.setSpeeds(
-      MathUtil.applyDeadband(-this.controller.getLeftX(), 0.1), 
-      MathUtil.applyDeadband(this.controller.getLeftY(), 0.1), 
-      MathUtil.applyDeadband(this.controller.getRightX(), 0.1), 
+      MathUtil.applyDeadband(-this.controller.getLeftX(), 0.1)*0.1, 
+      MathUtil.applyDeadband(this.controller.getLeftY(), 0.1)*0.1, 
+      this.heading, 
+      true,
       true
     );
     this.swerveDrive.update();
-  }
-
-  @Override
-  public void initSendable(SendableBuilder builder) {
-      // TODO Auto-generated method stub
-      super.initSendable(builder);
   }
 }

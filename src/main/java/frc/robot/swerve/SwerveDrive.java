@@ -1,6 +1,7 @@
 package frc.robot.swerve;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
@@ -18,9 +19,11 @@ public class SwerveDrive implements Sendable {
     private SwerveModule[] modules;
     private SwerveIMU imu;
     private Pose2d pose;
+    private Rotation2d headingSetpoint;
 
     public SwerveDrive(Pose2d initialPose, SwerveIMU imu, SwerveModule... modules) {
         this.imu = imu;
+        this.imu.calibrate();
         this.modules = modules;
         this.pose = initialPose;
         Translation2d[] positions = new Translation2d[this.modules.length];
@@ -37,14 +40,20 @@ public class SwerveDrive implements Sendable {
             modulePositions, 
             this.pose
         );
+        this.headingSetpoint = new Rotation2d();
         SmartDashboard.putData("swerveDrive", this);
     }
     
-    public void setSpeeds(double x, double y, double h, boolean fieldRel) {
-        if (fieldRel) {
-            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x, y, h, this.imu.getHeading());
+    public void setSpeeds(double x, double y, Rotation2d h, boolean fieldRel, boolean relativeHeading) {
+        if (relativeHeading) {
+            this.headingSetpoint = new Rotation2d(h.getRadians());
+            h = this.headingSetpoint.minus(this.imu.getHeading());
+            h.times(0.5);
+        }
+        if (true) {
+            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x, y, h.getRadians(), this.imu.getHeading());
         } else { 
-            this.speeds = new ChassisSpeeds(x, y, h);
+            this.speeds = new ChassisSpeeds(x, y, h.getRadians());
         }
     }
 
@@ -67,6 +76,7 @@ public class SwerveDrive implements Sendable {
         builder.setSmartDashboardType("SwerveDrive");
         builder.addDoubleProperty("swerveDrive/imu/heading", () -> this.imu.getHeading().getDegrees(), null);
         builder.addDoubleProperty("swerveDrive/imu/magneticHeading", () -> this.imu.getCompassHeading().getDegrees(), null);
+        builder.addDoubleProperty("swerveDrive/imu/headingOffset", () -> this.imu.getHeadingOffset().getDegrees(), (double offset) -> this.imu.setHeadingOffset(Rotation2d.fromDegrees(offset)));
     }
 
     

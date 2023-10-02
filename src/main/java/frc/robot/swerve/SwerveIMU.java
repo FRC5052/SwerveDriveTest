@@ -11,13 +11,15 @@ public interface SwerveIMU {
     public Translation3d getWorldAccel();
     public void calibrate();
     public void zeroHeading();
+    public Rotation2d getHeadingOffset();
+    public void setHeadingOffset(Rotation2d offset);
+    // public void syncHeadingToMagnet();
     
     public class NavXSwerveIMU implements SwerveIMU {
         private AHRS navX;
 
         public NavXSwerveIMU() {
             this.navX = new AHRS();
-            
         }
 
         @Override
@@ -58,5 +60,15 @@ public interface SwerveIMU {
         public void zeroHeading() {
             this.navX.reset();
         }
+
+        @Override
+        public Rotation2d getHeadingOffset() {
+            return Rotation2d.fromDegrees(this.navX.getAngleAdjustment());
+        }
+
+        @Override
+        public void setHeadingOffset(Rotation2d offset) {
+            // this.navX.setAngleAdjustment(offset.getDegrees());
+        }        
     }
 }
