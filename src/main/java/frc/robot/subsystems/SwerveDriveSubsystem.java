@@ -84,8 +84,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   public void periodic() {
     this.heading = this.heading.plus(Rotation2d.fromRotations(MathUtil.applyDeadband(this.controller.getRightX(), 0.1)*0.01));
     this.swerveDrive.setSpeeds(
-      MathUtil.applyDeadband(-this.controller.getLeftX(), 0.1)*0.1, 
       MathUtil.applyDeadband(this.controller.getLeftY(), 0.1)*0.1, 
+      MathUtil.applyDeadband(this.controller.getLeftX(), 0.1)*0.1, 
       this.heading, 
       true,
       true
