@@ -27,51 +27,36 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   /** Creates a new ExampleSubsystem. */
   public SwerveDriveSubsystem() {
     this.heading = new Rotation2d();
-    PIDController pivotController = new PIDController(0.15, 0, 0.0);
-    PIDController driveController = new PIDController(0.001, 0, 0);
+    SwerveModule.SwerveModuleConfig cfg = new SwerveModule.SwerveModuleConfig()
+      .driveGearRatio(6.75)
+      .pivotGearRatio(12.8)
+      .wheelDiameterInches(4.0)
+      .drivePID(null)
+      .pivotPID(new PIDController(0.15, 0, 0.0))
+    ;
     this.swerveDrive = new SwerveDrive(
       new Pose2d(), 
       new SwerveIMU.NavXSwerveIMU(), 
-      new SwerveModule(new SwerveModule.SwerveModuleConfig() // Front Right
-        .driveGearRatio(6.75)
-        .pivotGearRatio(12.8)
+      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
         .positionCentimeters(new Translation2d(29, 29))
-        .drivePID(driveController)
-        .pivotPID(pivotController)
-        .wheelDiameterInches(4.0)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(158.47), false))
       ),
-      new SwerveModule(new SwerveModule.SwerveModuleConfig() // Front Left
-        .driveGearRatio(6.75)
-        .pivotGearRatio(12.8)
+      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .positionCentimeters(new Translation2d(-29, 29))
-        .drivePID(driveController)
-        .pivotPID(pivotController)
-        .wheelDiameterInches(4.0)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(0.26), false))
       ),
-      new SwerveModule(new SwerveModule.SwerveModuleConfig() // Back Right
-        .driveGearRatio(6.75)
-        .pivotGearRatio(12.8)
+      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
         .positionCentimeters(new Translation2d(29, -29))
-        .drivePID(driveController)
-        .pivotPID(pivotController)
-        .wheelDiameterInches(4.0)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(-122.08), false))
       ),
-      new SwerveModule(new SwerveModule.SwerveModuleConfig() // Back Left
-        .driveGearRatio(6.75)
-        .pivotGearRatio(12.8)
+      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
         .positionCentimeters(new Translation2d(-29, -29))
-        .drivePID(driveController)
-        .pivotPID(pivotController)
-        .wheelDiameterInches(4.0)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, true))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(123.05), false))
@@ -90,6 +75,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       true,
       true
     );
+    if (this.controller.getStartButtonPressed()) {
+      this.swerveDrive.zeroHeading();
+    }
     this.swerveDrive.update();
   }
 }

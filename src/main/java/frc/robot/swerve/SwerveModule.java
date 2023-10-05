@@ -54,9 +54,9 @@ public class SwerveModule implements Sendable {
         return this.getActualSpeed() / 200.0;
     }
 
-    // Returns the total distance traveled by the module in meters.
+    // Returns the total distance traveled by the module's wheel in meters.
     public double getTotalDistance() {
-        return ((this.cfg.driveMotor.getPosition() * this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference();
+        return ((this.cfg.driveMotor.getPosition() / this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference();
     }
 
     public void update() {
@@ -77,6 +77,19 @@ public class SwerveModule implements Sendable {
 
         public SwerveModuleConfig() {
 
+        }
+
+        public static SwerveModuleConfig copyOf(SwerveModuleConfig src) {
+            var dst = new SwerveModuleConfig();
+            if (src.driveController != null) dst.driveController = new PIDController(src.driveController.getP(), src.driveController.getI(), src.driveController.getD());
+            else dst.driveController = null;
+            if (src.pivotController != null) dst.pivotController = new PIDController(src.pivotController.getP(), src.pivotController.getI(), src.pivotController.getD());
+            else dst.pivotController = null;
+            dst.driveGearRatio = src.driveGearRatio;
+            dst.pivotGearRatio = src.pivotGearRatio;
+            dst.wheelDiameter = src.wheelDiameter;
+            dst.optimize = src.optimize;
+            return dst;
         }
 
         public SwerveModuleConfig driveMotor(SwerveMotor motor) {
@@ -172,5 +185,6 @@ public class SwerveModule implements Sendable {
         builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed() / 2.0, null);
         builder.addDoubleProperty("actualAngle", () -> this.getActualAngle().getDegrees(), null);
         builder.addDoubleProperty("magnetOffset", () -> this.cfg.absoluteEncoder.getOffset().getDegrees(), (double val) -> this.cfg.absoluteEncoder.setOffset(Rotation2d.fromDegrees(val)));
+        builder.addDoubleProperty("totalDistance", this::getTotalDistance, null);
     }
 }

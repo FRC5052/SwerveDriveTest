@@ -34,20 +34,20 @@ public interface SwerveIMU {
 
         @Override
         public Rotation2d getHeading() {
-            return Rotation2d.fromDegrees((double)this.navX.getFusedHeading());
+            return Rotation2d.fromDegrees((double)this.navX.getAngle());
         }
 
         @Override
         public Rotation2d getCompassHeading() {
-            return Rotation2d.fromDegrees((double)this.navX.getFusedHeading());
+            return Rotation2d.fromDegrees((double)this.navX.getCompassHeading());
         }
 
         @Override
         public Translation3d getWorldAccel() {
             return new Translation3d(
-                this.navX.getWorldLinearAccelX() / 9.80665, 
-                this.navX.getWorldLinearAccelY() / 9.80665, 
-                this.navX.getWorldLinearAccelZ() / 9.80665
+                this.navX.getWorldLinearAccelX(), 
+                this.navX.getWorldLinearAccelY(), 
+                this.navX.getWorldLinearAccelZ()
             );
         }
 
@@ -58,7 +58,7 @@ public interface SwerveIMU {
 
         @Override
         public void zeroHeading() {
-            this.navX.reset();
+            this.setHeadingOffset(this.getHeadingOffset().minus(this.getHeading()));
         }
 
         @Override
@@ -68,7 +68,7 @@ public interface SwerveIMU {
 
         @Override
         public void setHeadingOffset(Rotation2d offset) {
-            // this.navX.setAngleAdjustment(offset.getDegrees());
+            this.navX.setAngleAdjustment(offset.getDegrees());
         }        
     }
 }
