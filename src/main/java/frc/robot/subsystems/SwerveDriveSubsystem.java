@@ -19,6 +19,7 @@ import frc.robot.swerve.SwerveEncoder;
 import frc.robot.swerve.SwerveIMU;
 import frc.robot.swerve.SwerveModule;
 import frc.robot.swerve.SwerveMotor;
+import frc.robot.swerve.SwerveDrive.HeadingControlMode;
 
 public class SwerveDriveSubsystem extends SubsystemBase {
   private SwerveDrive swerveDrive;
@@ -67,13 +68,12 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    this.heading = this.heading.plus(Rotation2d.fromRotations(MathUtil.applyDeadband(this.controller.getRightX(), 0.1)*0.01));
     this.swerveDrive.setSpeeds(
       MathUtil.applyDeadband(this.controller.getLeftY(), 0.1)*0.1, 
       MathUtil.applyDeadband(this.controller.getLeftX(), 0.1)*0.1, 
-      this.heading, 
+      Rotation2d.fromRotations(MathUtil.applyDeadband(this.controller.getRightX(), 0.1)*0.01), 
       true,
-      true
+      HeadingControlMode.kHeadingChange
     );
     if (this.controller.getStartButtonPressed()) {
       this.swerveDrive.zeroHeading();

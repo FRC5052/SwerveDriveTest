@@ -7,6 +7,7 @@ import edu.wpi.first.math.geometry.*;
 public interface SwerveIMU {
     public Rotation3d getRotation();
     public Rotation2d getHeading();
+    public Rotation2d getRawHeading();
     public Rotation2d getCompassHeading();
     public Translation3d getWorldAccel();
     public void calibrate();
@@ -34,7 +35,12 @@ public interface SwerveIMU {
 
         @Override
         public Rotation2d getHeading() {
-            return Rotation2d.fromDegrees((double)this.navX.getAngle());
+            return Rotation2d.fromDegrees(this.navX.getAngle());
+        }
+
+        @Override
+        public Rotation2d getRawHeading() {
+            return this.getHeading().plus(this.getHeadingOffset());
         }
 
         @Override
@@ -58,7 +64,7 @@ public interface SwerveIMU {
 
         @Override
         public void zeroHeading() {
-            this.setHeadingOffset(this.getHeadingOffset().minus(this.getHeading()));
+            this.setHeadingOffset(this.getRawHeading());
         }
 
         @Override

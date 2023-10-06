@@ -24,6 +24,27 @@ public class SwerveDrive implements Sendable {
     private Field2d field;
     private boolean poseOverriden;
 
+    public enum HeadingControlMode {
+        // Value is to be interpreted as raw speed.
+        kSpeedOnly,
+        // Value is the new heading setpoint.
+        kHeadingSet,
+        // Value is the change in the heading.
+        kHeadingChange,
+        ;
+
+        boolean requiresControlLoop() {
+            switch (this) {
+                case kHeadingChange:
+                case kHeadingSet:
+                    return true;
+                default:
+                    return false;
+                
+            }
+        }
+    }
+ 
     public SwerveDrive(Pose2d initialPose, SwerveIMU imu, SwerveModule... modules) {
         this.imu = imu;
         this.imu.calibrate();
@@ -50,12 +71,24 @@ public class SwerveDrive implements Sendable {
         SmartDashboard.putData("swerveDrive", this);
     }
     
-    public void setSpeeds(double x, double y, Rotation2d h, boolean fieldRel, boolean relativeHeading) {
-        if (relativeHeading) {
-            this.headingSetpoint = new Rotation2d(h.getRadians());
-            double change = this.headingSetpoint.minus(this.imu.getHeading()).getRotations();
-            h = Rotation2d.fromRotations(Math.abs(change) <= 0.5 ? change : Math.copySign(0.5, change) );
+    public void setSpeeds(double x, double y, Rotation2d h, boolean fieldRel, HeadingControlMode mode) {
+        switch (mode) {
+            case kHeadingChange:
+                this.headingSetpoint = this.headingSetpoint.plus(h);
+                break;
+            case kHeadingSet:
+                this.headingSetpoint = new Rotation2d(h.getRadians());
+                break;
+            default:
+                break;
+            
         }
+
+        if (mode.requiresControlLoop()) {
+            double diff = this.imu.getHeading().getRotations() - this.headingSetpoint.getRotations();
+            h = Rotation2d.fromRotations(Math.abs(diff) > 0.5 ? Math.copySign(0.5, diff) : diff);
+        }
+
         if (fieldRel) {
             this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x, y, h.getRadians(), this.imu.getHeading().unaryMinus());
         } else { 
@@ -100,6 +133,7 @@ public class SwerveDrive implements Sendable {
     public void initSendable(SendableBuilder builder) {
         builder.setSmartDashboardType("SwerveDrive");
         builder.addDoubleProperty("imu/heading", () -> this.imu.getHeading().getDegrees(), null);
+        builder.addDoubleProperty("imu/rawHeading", () -> this.imu.getRawHeading().getDegrees(), null);
         builder.addDoubleProperty("imu/headingSetpoint", () -> this.headingSetpoint.getDegrees(), null);
         builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading().getDegrees(), null);
         builder.addDoubleProperty("imu/headingOffset", () -> this.imu.getHeadingOffset().getDegrees(), (double offset) -> this.imu.setHeadingOffset(Rotation2d.fromDegrees(offset)));

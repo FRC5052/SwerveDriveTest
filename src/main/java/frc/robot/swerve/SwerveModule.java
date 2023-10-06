@@ -47,7 +47,7 @@ public class SwerveModule implements Sendable {
 
     // Returns the speed of the module in meters per second.
     public double getActualSpeed() {
-        return MathUtil.applyDeadband(((this.cfg.driveMotor.getVelocity() * this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference(), 1e-3);
+        return MathUtil.applyDeadband(((this.cfg.driveMotor.getVelocity() / this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference(), 1e-3);
     }
 
     public double getActualNormalSpeed() {
