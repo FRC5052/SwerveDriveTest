@@ -35,7 +35,7 @@ public interface SwerveIMU {
 
         @Override
         public Rotation2d getHeading() {
-            return Rotation2d.fromDegrees(this.navX.getAngle());
+            return Rotation2d.fromDegrees((double)this.navX.getFusedHeading()-this.navX.getAngleAdjustment());
         }
 
         @Override

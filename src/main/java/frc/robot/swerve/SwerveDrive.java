@@ -85,13 +85,13 @@ public class SwerveDrive implements Sendable {
         }
 
         if (mode.requiresControlLoop()) {
-            double diff = this.imu.getHeading().getRotations() - this.headingSetpoint.getRotations();
-            h = Rotation2d.fromRotations(Math.abs(diff) > 0.5 ? Math.copySign(0.5, diff) : diff);
+            var diff = this.imu.getHeading().unaryMinus().minus(this.headingSetpoint);
+            h = Math.abs(diff.getRotations()) > 0.5 ? Rotation2d.fromRotations(Math.copySign(0.5, diff.getRotations())) : diff;
         }
 
         if (fieldRel) {
             this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x, y, h.getRadians(), this.imu.getHeading().unaryMinus());
-        } else { 
+        } else {
             this.speeds = new ChassisSpeeds(x, y, h.getRadians());
         }
     }
