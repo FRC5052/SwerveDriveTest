@@ -10,8 +10,10 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import frc.robot.Robot;
 
 public class SwerveDrive implements Sendable {
     private SwerveDriveKinematics kinematics;
@@ -21,6 +23,7 @@ public class SwerveDrive implements Sendable {
     private SwerveIMU imu;
     private Pose2d pose;
     private Rotation2d headingSetpoint;
+    private Translation2d currentVelocity;
     private Field2d field;
     private boolean poseOverriden;
 
@@ -72,9 +75,10 @@ public class SwerveDrive implements Sendable {
     }
     
     public void setSpeeds(double x, double y, Rotation2d h, boolean fieldRel, HeadingControlMode mode) {
+
         switch (mode) {
             case kHeadingChange:
-                this.headingSetpoint = this.headingSetpoint.plus(h);
+                this.headingSetpoint = this.headingSetpoint.plus(h.times(Robot.kDefaultPeriod));
                 break;
             case kHeadingSet:
                 this.headingSetpoint = new Rotation2d(h.getRadians());
@@ -86,7 +90,7 @@ public class SwerveDrive implements Sendable {
 
         if (mode.requiresControlLoop()) {
             var diff = this.imu.getHeading().unaryMinus().minus(this.headingSetpoint);
-            h = Math.abs(diff.getRotations()) > 0.5 ? Rotation2d.fromRotations(Math.copySign(0.5, diff.getRotations())) : diff;
+            h = Math.abs(diff.getRotations()) > 0.25 ? Rotation2d.fromRotations(Math.copySign(0.25, diff.getRotations())) : diff;
         }
 
         if (fieldRel) {
@@ -104,6 +108,15 @@ public class SwerveDrive implements Sendable {
     public void overridePosition(Pose2d pose) {
         this.pose = pose;
         this.poseOverriden = true;
+    }
+
+    public Translation2d getVelocityVector() {
+        if (this.currentVelocity != null) return this.currentVelocity;
+        Translation2d velocity = new Translation2d();
+        for (SwerveModule module : this.modules) {
+            velocity = velocity.plus(module.getVelocityVector());
+        }
+        return velocity.div((double)this.modules.length).rotateBy(this.imu.getHeading());
     }
 
     public void update() {
@@ -127,6 +140,7 @@ public class SwerveDrive implements Sendable {
             );
         }
         this.field.setRobotPose(this.pose);
+        this.currentVelocity = null;
     }
 
     @Override
@@ -137,11 +151,10 @@ public class SwerveDrive implements Sendable {
         builder.addDoubleProperty("imu/headingSetpoint", () -> this.headingSetpoint.getDegrees(), null);
         builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading().getDegrees(), null);
         builder.addDoubleProperty("imu/headingOffset", () -> this.imu.getHeadingOffset().getDegrees(), (double offset) -> this.imu.setHeadingOffset(Rotation2d.fromDegrees(offset)));
-        builder.addDoubleArrayProperty("imu/acceleration", () -> new double[] {
-            this.imu.getWorldAccel().getX(), 
-            this.imu.getWorldAccel().getY(), 
-            this.imu.getWorldAccel().getZ(), 
-        }, null);
+        builder.addDoubleProperty("imu/velocity/x", () -> this.getVelocityVector().getX(), null);
+        builder.addDoubleProperty("imu/velocity/y", () -> this.getVelocityVector().getY(), null);
+        builder.addDoubleProperty("imu/velocity/norm", () -> this.getVelocityVector().getNorm(), null);
+        builder.addDoubleProperty("imu/velocity/angle", () -> this.getVelocityVector().getAngle().getDegrees(), null);
     }
 
     

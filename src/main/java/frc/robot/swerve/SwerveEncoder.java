@@ -23,7 +23,7 @@ public interface SwerveEncoder {
     public Rotation2d getOffset();
     /** Sets whether the output of the encoder are to be reversed. */
     public void setReversed(boolean reverse);
-    /** Returns if this encoder supports absolute positioning. */
+    /** Returns whether this encoder supports absolute positioning. */
     public boolean isAbsolute();
 
     public static class CANCoderSwerveEncoder implements SwerveEncoder {

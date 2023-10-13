@@ -10,6 +10,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.util.sendable.SendableBuilder;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.CommandBase;
@@ -69,9 +70,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   @Override
   public void periodic() {
     this.swerveDrive.setSpeeds(
-      MathUtil.applyDeadband(this.controller.getLeftY(), 0.1)*0.1, 
-      MathUtil.applyDeadband(this.controller.getLeftX(), 0.1)*0.1, 
-      Rotation2d.fromRotations(MathUtil.applyDeadband(this.controller.getRightX(), 0.1)*0.01), 
+      Math.pow(MathUtil.applyDeadband(-this.controller.getLeftX(), 0.1), 3), 
+      Math.pow(MathUtil.applyDeadband(this.controller.getLeftY(), 0.1), 3), 
+      Rotation2d.fromRotations(Math.pow(MathUtil.applyDeadband(-this.controller.getRightX(), 0.1), 3)),
       true,
       HeadingControlMode.kHeadingChange
     );

@@ -59,6 +59,10 @@ public class SwerveModule implements Sendable {
         return ((this.cfg.driveMotor.getPosition() / this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference();
     }
 
+    public Translation2d getVelocityVector() {
+        return new Translation2d(this.getActualSpeed(), this.getActualAngle());
+    }
+
     public void update() {
         // double driveDifference = this.getStateSpeed()-this.getActualNormalSpeed(); 
         // double driveSpeed = driveDifference > 0.01 ? this.getActualNormalSpeed()+Math.copySign(0.01, driveDifference) : this.getStateSpeed();
