@@ -64,9 +64,7 @@ public class SwerveModule implements Sendable {
     }
 
     public void update() {
-        // double driveDifference = this.getStateSpeed()-this.getActualNormalSpeed(); 
-        // double driveSpeed = driveDifference > 0.01 ? this.getActualNormalSpeed()+Math.copySign(0.01, driveDifference) : this.getStateSpeed();
-        this.cfg.driveMotor.set((this.getStateSpeed()));
+        this.cfg.driveMotor.set(this.cfg.driveController.calculate(this.getActualSpeed(), this.getStateSpeed()));
         this.cfg.pivotMotor.set(this.cfg.pivotController.calculate(this.getActualAngle().getRadians(), this.getStateAngle().getRadians()));
     }
 
@@ -189,6 +187,11 @@ public class SwerveModule implements Sendable {
         builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed() / 2.0, null);
         builder.addDoubleProperty("actualAngle", () -> this.getActualAngle().getDegrees(), null);
         builder.addDoubleProperty("magnetOffset", () -> this.cfg.absoluteEncoder.getOffset().getDegrees(), (double val) -> this.cfg.absoluteEncoder.setOffset(Rotation2d.fromDegrees(val)));
+        builder.addDoubleProperty("pControllerOutput", () -> {
+            double driveDifference = this.getStateSpeed()-this.getActualSpeed(); 
+            double driveSpeed = Math.abs(driveDifference) > 0.01 ? this.getActualSpeed()+Math.copySign(0.01, driveDifference) : this.getStateSpeed();
+            return driveSpeed;
+        }, null);
         builder.addDoubleProperty("totalDistance", this::getTotalDistance, null);
     }
 }

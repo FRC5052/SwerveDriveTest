@@ -33,7 +33,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       .driveGearRatio(6.75)
       .pivotGearRatio(12.8)
       .wheelDiameterInches(4.0)
-      .drivePID(null)
+      .drivePID(new PIDController(0.05, 0, 0.0))
       .pivotPID(new PIDController(0.15, 0, 0.0))
     ;
     this.swerveDrive = new SwerveDrive(
@@ -64,6 +64,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(123.05), false))
       )
     );
+    this.swerveDrive.setMaxDriveSpeed(7.0);
+    this.swerveDrive.setMaxTurnSpeed(0.75);
     this.controller = new XboxController(0);
   }
 

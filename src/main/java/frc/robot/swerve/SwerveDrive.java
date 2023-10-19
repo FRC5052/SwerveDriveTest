@@ -26,6 +26,8 @@ public class SwerveDrive implements Sendable {
     private Translation2d currentVelocity;
     private Field2d field;
     private boolean poseOverriden;
+    private double maxDriveSpeed;
+    private double maxTurnSpeed;
 
     public enum HeadingControlMode {
         // Value is to be interpreted as raw speed.
@@ -73,8 +75,26 @@ public class SwerveDrive implements Sendable {
         SmartDashboard.putData("field", this.field);
         SmartDashboard.putData("swerveDrive", this);
     }
+
+    public void setMaxDriveSpeed(double speed) {
+        this.maxDriveSpeed = speed;
+    }
     
+    public void setMaxTurnSpeed(double speed) {
+        this.maxTurnSpeed = speed;
+    }
+
+    public double getMaxDriveSpeed() {
+        return this.maxDriveSpeed;
+    }
+
+    public double getMaxTurnSpeed() {
+        return this.maxTurnSpeed;
+    }
+
     public void setSpeeds(double x, double y, Rotation2d h, boolean fieldRel, HeadingControlMode mode) {
+
+        h = h.times(maxTurnSpeed/2);
 
         switch (mode) {
             case kHeadingChange:
@@ -90,13 +110,13 @@ public class SwerveDrive implements Sendable {
 
         if (mode.requiresControlLoop()) {
             var diff = this.imu.getHeading().unaryMinus().minus(this.headingSetpoint);
-            h = Math.abs(diff.getRotations()) > 0.25 ? Rotation2d.fromRotations(Math.copySign(0.25, diff.getRotations())) : diff;
+            h = (Math.abs(diff.getRotations()) > 1.0 ? Rotation2d.fromRotations(Math.copySign(1.0, diff.getRotations())) : diff).times(20);
         }
 
         if (fieldRel) {
-            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x, y, h.getRadians(), this.imu.getHeading().unaryMinus());
+            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x * maxDriveSpeed, y * maxDriveSpeed, h.getRadians(), this.imu.getHeading().unaryMinus());
         } else {
-            this.speeds = new ChassisSpeeds(x, y, h.getRadians());
+            this.speeds = new ChassisSpeeds(x * maxDriveSpeed, y * maxDriveSpeed, h.getRadians());
         }
     }
 
