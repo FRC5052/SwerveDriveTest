@@ -1,11 +1,14 @@
 package frc.robot.swerve;
 
 import com.revrobotics.CANSparkMax;
-import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+import com.revrobotics.CANSparkBase.IdleMode;
+import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.util.Units;
 
 public interface SwerveMotor {
+    /** Returns the maximum speed in radians per second */
+    public double maxSpeed();
     /** Gets the normalized throttle of the motor. */
     public double get();
     /** Sets the normalized throttle of the motor. */
@@ -32,9 +35,10 @@ public interface SwerveMotor {
     public static class CANSparkMaxSwerveMotor implements SwerveMotor {
         private CANSparkMax motor;
 
-        public CANSparkMaxSwerveMotor(int id, boolean reversed) {
+        public CANSparkMaxSwerveMotor(int id, boolean reversed, IdleMode idleMode) {
             this.motor = new CANSparkMax(id, MotorType.kBrushless);
             this.motor.setInverted(reversed);
+            this.motor.setIdleMode(idleMode);
             this.motor.getEncoder().setPositionConversionFactor(2 * Math.PI);
             this.motor.getEncoder().setVelocityConversionFactor((2 * Math.PI) / 60.0);
         }
@@ -82,6 +86,11 @@ public interface SwerveMotor {
         @Override
         public void resetPosition(double position) {
             this.motor.getEncoder().setPosition(position);
+        }
+
+        @Override
+        public double maxSpeed() {
+            return Units.rotationsPerMinuteToRadiansPerSecond(5820);
         }
     }
 }

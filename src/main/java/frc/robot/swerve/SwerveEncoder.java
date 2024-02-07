@@ -1,8 +1,10 @@
 package frc.robot.swerve;
 
-import com.ctre.phoenix.sensors.AbsoluteSensorRange;
-import com.ctre.phoenix.sensors.CANCoder;
-import com.ctre.phoenix.sensors.CANCoderConfiguration;
+import com.ctre.phoenix6.hardware.CANcoder;
+import com.ctre.phoenix6.signals.AbsoluteSensorRangeValue;
+import com.ctre.phoenix6.signals.SensorDirectionValue;
+import com.ctre.phoenix6.configs.CANcoderConfiguration;
+
 
 import edu.wpi.first.math.geometry.Rotation2d;
 
@@ -27,58 +29,61 @@ public interface SwerveEncoder {
     public boolean isAbsolute();
 
     public static class CANCoderSwerveEncoder implements SwerveEncoder {
-        private CANCoder encoder;
+        private CANcoder encoder;
+        private CANcoderConfiguration config;
+        private static final double conversionFactor = (2 * Math.PI);
 
         public CANCoderSwerveEncoder(int id, Rotation2d offset, boolean reverse) {
-            CANCoderConfiguration config = new CANCoderConfiguration();
+            this.config = new CANcoderConfiguration();
 
-            config.sensorCoefficient = (2 * Math.PI) / 4096.0; // Sets output range to 0 - 2pi
-            config.absoluteSensorRange = AbsoluteSensorRange.Signed_PlusMinus180; // Sets output to signed
-            config.magnetOffsetDegrees = offset.getDegrees();
-            config.sensorDirection = reverse;
+            this.config.MagnetSensor.AbsoluteSensorRange = AbsoluteSensorRangeValue.Signed_PlusMinusHalf; // Sets output to signed
+            this.config.MagnetSensor.MagnetOffset = offset.getRotations();
+            this.config.MagnetSensor.SensorDirection = reverse ? SensorDirectionValue.Clockwise_Positive : SensorDirectionValue.CounterClockwise_Positive;
             
-            this.encoder = new CANCoder(id);
-            this.encoder.configAllSettings(config);
+            this.encoder = new CANcoder(id);
+            this.encoder.getConfigurator().apply(this.config);
         }
 
         @Override
         public double getAbsolutePosition() {
-            return this.encoder.getAbsolutePosition();
+            return this.encoder.getAbsolutePosition().getValueAsDouble() * conversionFactor;
         }
 
         @Override
         public double getPosition() {
-            return this.encoder.getPosition();
+            return this.encoder.getPosition().getValueAsDouble() * conversionFactor;
         }
 
         @Override
         public double getVelocity() {
-            return this.encoder.getVelocity();
+            return this.encoder.getVelocity().getValueAsDouble() * conversionFactor;
         }
 
         @Override
         public void setPosition(double position) {
-            this.encoder.setPosition(position);
+            this.encoder.setPosition(position / conversionFactor);
         }
 
         @Override
         public void setPositionToAbsolute() {
-            this.encoder.setPositionToAbsolute();
+            this.encoder.setPosition(this.encoder.getAbsolutePosition().getValueAsDouble());
         }
 
         @Override
         public void setOffset(Rotation2d offset) {
-            this.encoder.configMagnetOffset(offset.getDegrees());
+            this.config.MagnetSensor.MagnetOffset = offset.getRotations();
+            this.encoder.getConfigurator().apply(this.config);
         }
 
         @Override
         public void setReversed(boolean reverse) {
-            this.encoder.configSensorDirection(reverse);
+            this.config.MagnetSensor.SensorDirection = reverse ? SensorDirectionValue.Clockwise_Positive : SensorDirectionValue.CounterClockwise_Positive;
+            this.encoder.getConfigurator().apply(this.config);
         }
 
         @Override
         public Rotation2d getOffset() {
-            return Rotation2d.fromDegrees(this.encoder.configGetMagnetOffset());
+            return Rotation2d.fromRotations(this.config.MagnetSensor.MagnetOffset);
         }
 
         @Override

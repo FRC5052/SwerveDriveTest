@@ -6,10 +6,19 @@ package frc.robot;
 
 import frc.robot.Constants.OperatorConstants;
 import frc.robot.commands.Autos;
-import frc.robot.commands.ExampleCommand;
 import frc.robot.subsystems.ExampleSubsystem;
+import frc.robot.subsystems.IntakeAndShooterSubsystem;
 import frc.robot.subsystems.SwerveDriveSubsystem;
+import frc.robot.subsystems.IntakeAndShooterSubsystem.IntakeBallCommand;
+import edu.wpi.first.cscore.CameraServerJNI.TelemetryKind;
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.FunctionalCommand;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.button.CommandGenericHID;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 
@@ -23,15 +32,30 @@ public class RobotContainer {
   // The robot's subsystems and commands are defined here...
   private final ExampleSubsystem m_exampleSubsystem = new ExampleSubsystem();
 
-  private final SwerveDriveSubsystem m_swerveDriveSubsystem = new SwerveDriveSubsystem();
+  public final SwerveDriveSubsystem m_swerveDriveSubsystem;
+  public final IntakeAndShooterSubsystem m_intakeShooterSubsystem;
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
-  private final CommandXboxController m_driverController =
-      new CommandXboxController(OperatorConstants.kDriverControllerPort);
+  private final CommandGenericHID m_driverController =
+      new CommandGenericHID(OperatorConstants.kDriverControllerPort);
+
+  private static RobotContainer instance;
+
+  public static RobotContainer getStaticInstance() {
+    return instance;
+  }
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
     // Configure the trigger bindings
+
+    instance = this;
+
+    this.m_swerveDriveSubsystem = new SwerveDriveSubsystem(() -> -this.m_driverController.getRawAxis(0), () -> this.m_driverController.getRawAxis(1), () -> -this.m_driverController.getRawAxis(2));
+    this.m_intakeShooterSubsystem = new IntakeAndShooterSubsystem();
+
+   
+
     configureBindings();
   }
 
@@ -46,12 +70,55 @@ public class RobotContainer {
    */
   private void configureBindings() {
     // Schedule `ExampleCommand` when `exampleCondition` changes to `true`
-    new Trigger(m_exampleSubsystem::exampleCondition)
-        .onTrue(new ExampleCommand(m_exampleSubsystem));
 
     // Schedule `exampleMethodCommand` when the Xbox controller's B button is pressed,
     // cancelling on release.
-    m_driverController.b().whileTrue(m_exampleSubsystem.exampleMethodCommand());
+
+    m_driverController.button(3).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.resetHeading()));
+    m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.moveBy(new Translation2d(1, 1))));
+    m_driverController.button(6).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.cancelMove()));
+    m_driverController.button(2).onTrue(m_intakeShooterSubsystem.getIntakeBallCommand());
+    m_driverController.button(1).whileTrue(new Command() {
+      private long ticks;
+
+      @Override
+      public void initialize() {
+        ticks = 0;
+      }
+
+      public double getTime() {
+        return (double)ticks * Robot.kDefaultPeriod; 
+      }
+
+      @Override
+      public void execute() {
+          m_intakeShooterSubsystem.setShooterSpeed(((3.0/2.0) - (3.0 / (2.0 * (getTime() + 1.0)))) * ((1.0 - m_driverController.getRawAxis(3)) / 2));
+          ticks++;
+      }
+
+      @Override
+      public boolean isFinished() {
+          return getTime() >= 1.5;
+      }
+    });
+    m_driverController.button(1).onFalse(m_intakeShooterSubsystem.getShootBallCommand());
+x
+    m_driverController.button(8).whileTrue(new Command() {
+      private boolean on = true;
+
+      @Override
+      public void initialize() {
+        on = !on;
+        System.out.println(on ? "Full speed enabled." : "Full speed disabled.");
+        m_swerveDriveSubsystem.setFullSpeed(on);
+      }
+    });
+
+
+    m_driverController.povRight().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.yawBy(Rotation2d.fromDegrees(1.0))));
+    m_driverController.povLeft().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.yawBy(Rotation2d.fromDegrees(-1.0))));
+    m_driverController.povUp().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.pitchBy(Rotation2d.fromDegrees(0.5))));
+    m_driverController.povDown().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.pitchBy(Rotation2d.fromDegrees(-0.5))));
   }
 
   /**

@@ -59,7 +59,7 @@ public interface SwerveIMU {
 
         @Override
         public void calibrate() {
-            this.navX.calibrate();
+            
         }
 
         @Override

@@ -12,10 +12,28 @@ import edu.wpi.first.util.sendable.SendableBuilder;
 public class SwerveModule implements Sendable {
     private SwerveModuleConfig cfg;
     private SwerveModuleState state;
-    
+
     public SwerveModule(SwerveModuleConfig cfg) {
         this.cfg = cfg;
         this.state = new SwerveModuleState(0, Rotation2d.fromDegrees(0));
+    }
+
+    public void setDrivePID(PIDController controller, boolean clone) {
+        this.cfg.driveController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
+        this.cfg.driveController.setIZone(Double.POSITIVE_INFINITY);
+    }
+
+    public void setDrivePID(PIDController controller) {
+        this.setDrivePID(controller, false);
+    }
+
+    public void setPivotPID(PIDController controller, boolean clone) {
+        this.cfg.pivotController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
+        this.cfg.pivotController.setIZone(Double.POSITIVE_INFINITY);
+    }
+
+    public void setPivotPID(PIDController controller) {
+        this.setPivotPID(controller, false);
     }
 
     public void setState(SwerveModuleState state) {
@@ -51,12 +69,13 @@ public class SwerveModule implements Sendable {
     }
 
     public double getActualNormalSpeed() {
-        return this.getActualSpeed() / 200.0;
+        return this.getActualSpeed() / this.cfg.driveMotor.maxSpeed();
     }
 
     // Returns the total distance traveled by the module's wheel in meters.
     public double getTotalDistance() {
-        return ((this.cfg.driveMotor.getPosition() / this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference();
+        return (this.cfg.driveMotor.getPosition() / this.cfg.driveGearRatio) * this.cfg.getWheelRadius();
+        // return this.cfg.driveMotor.getPosition() / (2*Math.PI);
     }
 
     public Translation2d getVelocityVector() {
@@ -64,8 +83,14 @@ public class SwerveModule implements Sendable {
     }
 
     public void update() {
-        this.cfg.driveMotor.set(this.cfg.driveController.calculate(this.getActualSpeed(), this.getStateSpeed()));
-        this.cfg.pivotMotor.set(this.cfg.pivotController.calculate(this.getActualAngle().getRadians(), this.getStateAngle().getRadians()));
+        if (this.cfg.driveController != null) {
+            double drive = this.cfg.driveController.calculate(this.getActualSpeed(), this.getStateSpeed());
+            this.cfg.driveMotor.set(Double.isNaN(drive) ? 0.0 : drive);
+        }
+        if (this.cfg.pivotController != null) {
+            double pivot = this.cfg.pivotController.calculate(this.getActualAngle().getRotations(), this.getStateAngle().getRotations());
+            this.cfg.pivotMotor.set(Double.isNaN(pivot) ? 0.0 : pivot);
+        }
     }
 
     public static class SwerveModuleConfig {
@@ -177,6 +202,14 @@ public class SwerveModule implements Sendable {
         public double getWheelCircumference() {
             return this.wheelDiameter * Math.PI;
         }
+
+        public double getWheelDiameter() {
+            return this.wheelDiameter;
+        }
+
+        public double getWheelRadius() {
+            return this.wheelDiameter / 2;
+        }
     }
 
     @Override
@@ -184,7 +217,7 @@ public class SwerveModule implements Sendable {
         builder.setSmartDashboardType("SwerveModule");
         builder.addDoubleProperty("stateSpeed", this::getStateSpeed, null);
         builder.addDoubleProperty("stateAngle", () -> this.getStateAngle().getDegrees(), null);
-        builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed() / 2.0, null);
+        builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed() * 100, null);
         builder.addDoubleProperty("actualAngle", () -> this.getActualAngle().getDegrees(), null);
         builder.addDoubleProperty("magnetOffset", () -> this.cfg.absoluteEncoder.getOffset().getDegrees(), (double val) -> this.cfg.absoluteEncoder.setOffset(Rotation2d.fromDegrees(val)));
         builder.addDoubleProperty("pControllerOutput", () -> {
@@ -192,6 +225,8 @@ public class SwerveModule implements Sendable {
             double driveSpeed = Math.abs(driveDifference) > 0.01 ? this.getActualSpeed()+Math.copySign(0.01, driveDifference) : this.getStateSpeed();
             return driveSpeed;
         }, null);
+        builder.addDoubleProperty("pivotOutput", () -> this.cfg.pivotMotor.get(), null);
+        builder.addDoubleProperty("driveOutput", () -> this.cfg.driveMotor.get(), null);
         builder.addDoubleProperty("totalDistance", this::getTotalDistance, null);
     }
 }
