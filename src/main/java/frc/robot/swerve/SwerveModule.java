@@ -6,21 +6,36 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
+import static edu.wpi.first.units.Units.*;
+
+import edu.wpi.first.units.Angle;
+import edu.wpi.first.units.Distance;
+import edu.wpi.first.units.Measure;
+import edu.wpi.first.units.Velocity;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 
 public class SwerveModule implements Sendable {
     private SwerveModuleConfig cfg;
     private SwerveModuleState state;
+    private SwerveModuleState actualState;
 
+    private Rotation2d actualAngle;
+    private Translation2d velocityVector;
+
+    /*
+     * Constructs a
+     */
     public SwerveModule(SwerveModuleConfig cfg) {
         this.cfg = cfg;
         this.state = new SwerveModuleState(0, Rotation2d.fromDegrees(0));
+        this.actualAngle = new Rotation2d();
+        this.velocityVector = new Translation2d();
     }
+
 
     public void setDrivePID(PIDController controller, boolean clone) {
         this.cfg.driveController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
-        this.cfg.driveController.setIZone(Double.POSITIVE_INFINITY);
     }
 
     public void setDrivePID(PIDController controller) {
@@ -29,7 +44,7 @@ public class SwerveModule implements Sendable {
 
     public void setPivotPID(PIDController controller, boolean clone) {
         this.cfg.pivotController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
-        this.cfg.pivotController.setIZone(Double.POSITIVE_INFINITY);
+        this.cfg.pivotController.enableContinuousInput(-0.5, 0.5);
     }
 
     public void setPivotPID(PIDController controller) {
@@ -38,7 +53,7 @@ public class SwerveModule implements Sendable {
 
     public void setState(SwerveModuleState state) {
         if (this.cfg.optimize) {
-            state = SwerveModuleState.optimize(state, this.getActualAngle());
+            state = SwerveModuleState.optimize(state, Rotation2d.fromRadians(this.getActualAngle(Radians)));
         } 
         this.state = state;
     }
@@ -51,44 +66,82 @@ public class SwerveModule implements Sendable {
         return this.state;
     }
 
-    public double getStateSpeed() {
-        return this.state.speedMetersPerSecond;
+    public SwerveModuleState getActualState() {
+        return this.actualState;
+    }
+    
+
+    /**
+     * Returns the speed setpoint of this swerve module, in the given unit.
+     * 
+     * @param unit The unit to return the result in.
+     * @return The speed setpoint of this swerve module.
+     */
+    public double getStateSpeed(Velocity<Distance> unit) {
+        return unit.convertFrom(this.state.speedMetersPerSecond, MetersPerSecond);
+    }
+
+    /**
+     * Returns the angle setpoint of this swerve module, in the given unit.
+     * @param unit The unit to return the result in.
+     * @return The speed setpoint of this swerve module.
+     */
+    public double getStateAngle(Angle unit) {
+        return unit.convertFrom(this.state.angle.getRadians(), Radians);
     }
 
     public Rotation2d getStateAngle() {
         return this.state.angle;
     }
 
+    public double getActualAngle(Angle unit) {
+        return this.cfg.absoluteEncoder.getAbsolutePosition(unit);
+    }
+
     public Rotation2d getActualAngle() {
-        return Rotation2d.fromRadians(this.cfg.absoluteEncoder.getAbsolutePosition());
+        return this.actualAngle;
     }
 
     // Returns the speed of the module in meters per second.
-    public double getActualSpeed() {
-        return MathUtil.applyDeadband(((this.cfg.driveMotor.getVelocity() / this.cfg.driveGearRatio) / (2 * Math.PI)) * this.cfg.getWheelCircumference(), 1e-3);
+
+    public double getActualAngularSpeed(Velocity<Angle> unit) {
+        return MathUtil.applyDeadband(this.cfg.driveMotor.getVelocity(unit) / this.cfg.driveGearRatio, 1e-3);
+    }
+
+    public double getActualSpeed(Velocity<Distance> unit) {
+        return this.getActualAngularSpeed(RadiansPerSecond) * this.cfg.getWheelRadius(unit.getUnit());
     }
 
     public double getActualNormalSpeed() {
-        return this.getActualSpeed() / this.cfg.driveMotor.maxSpeed();
+        return this.getActualAngularSpeed(RadiansPerSecond) / this.cfg.driveMotor.maxSpeed(RadiansPerSecond);
     }
 
     // Returns the total distance traveled by the module's wheel in meters.
-    public double getTotalDistance() {
-        return (this.cfg.driveMotor.getPosition() / this.cfg.driveGearRatio) * this.cfg.getWheelRadius();
+    public double getTotalDistance(Distance unit) {
+        return (this.cfg.driveMotor.getPosition(Radians) / this.cfg.driveGearRatio) * this.cfg.getWheelRadius(unit);
         // return this.cfg.driveMotor.getPosition() / (2*Math.PI);
     }
 
-    public Translation2d getVelocityVector() {
-        return new Translation2d(this.getActualSpeed(), this.getActualAngle());
+    public Translation2d getVelocityVector(Velocity<Distance> unit) {
+        return new Translation2d(this.getActualSpeed(unit), this.getActualAngle());
     }
 
     public void update() {
-        if (this.cfg.driveController != null) {
-            double drive = this.cfg.driveController.calculate(this.getActualSpeed(), this.getStateSpeed());
+        this.actualAngle = new Rotation2d(this.getActualAngle(Radians));
+        this.actualState = new SwerveModuleState(this.getActualSpeed(MetersPerSecond), this.actualAngle);
+
+        if (this.cfg.driveMotor != null) {
+            double drive = this.cfg.driveController != null ? 
+                this.cfg.driveController.calculate(this.getActualSpeed(MetersPerSecond), this.getStateSpeed(MetersPerSecond)) 
+                :
+                this.getStateSpeed(MetersPerSecond) - this.getActualSpeed(MetersPerSecond);
             this.cfg.driveMotor.set(Double.isNaN(drive) ? 0.0 : drive);
         }
-        if (this.cfg.pivotController != null) {
-            double pivot = this.cfg.pivotController.calculate(this.getActualAngle().getRotations(), this.getStateAngle().getRotations());
+        if (this.cfg.pivotMotor != null) {
+            double pivot = this.cfg.pivotController != null ? 
+                this.cfg.pivotController.calculate(this.getActualAngle(Rotations), this.getStateAngle(Rotations)) 
+                :
+                this.getStateAngle(Rotations) - this.getActualAngle(Rotations);
             this.cfg.pivotMotor.set(Double.isNaN(pivot) ? 0.0 : pivot);
         }
     }
@@ -103,7 +156,7 @@ public class SwerveModule implements Sendable {
         private boolean optimize = true;
 
         public SwerveModuleConfig() {
-
+            
         }
 
         public static SwerveModuleConfig copyOf(SwerveModuleConfig src) {
@@ -134,43 +187,13 @@ public class SwerveModule implements Sendable {
             return this;
         }
 
-        public SwerveModuleConfig positionMeters(Translation2d position) {
-            this.position = position;
+        public SwerveModuleConfig position(Translation2d position, Distance unit) {
+            this.position = new Translation2d(unit.toBaseUnits(position.getX()), unit.toBaseUnits(position.getY()));
             return this;
         }
 
-        public SwerveModuleConfig positionFeet(Translation2d position) {
-            this.positionMeters(new Translation2d(Units.feetToMeters(position.getX()), Units.feetToMeters(position.getY())));
-            return this;
-        }
-
-        public SwerveModuleConfig positionCentimeters(Translation2d position) {
-            this.positionMeters(new Translation2d(position.getX() / 100.0, position.getY() / 100.0));
-            return this;
-        }
-
-        public SwerveModuleConfig positionInches(Translation2d position) {
-            this.positionMeters(new Translation2d(Units.feetToMeters(position.getX() / 12.0), Units.feetToMeters(position.getY() / 12.0)));
-            return this;
-        }
-
-        public SwerveModuleConfig wheelDiameterMeters(double diameter) {
-            this.wheelDiameter = diameter;
-            return this;
-        }
-
-        public SwerveModuleConfig wheelDiameterFeet(double diameter) {
-            this.wheelDiameterMeters(Units.feetToMeters(diameter));
-            return this;
-        }
-
-        public SwerveModuleConfig wheelDiameterCentimeters(double diameter) {
-            this.wheelDiameterMeters(diameter / 100.0);
-            return this;
-        }
-
-        public SwerveModuleConfig wheelDiameterInches(double diameter) {
-            this.wheelDiameterMeters(Units.feetToMeters(diameter / 12.0));
+        public SwerveModuleConfig wheelDiameter(double diameter, Distance unit) {
+            this.wheelDiameter = unit.toBaseUnits(diameter);
             return this;
         }
 
@@ -199,34 +222,34 @@ public class SwerveModule implements Sendable {
             return this;
         }
 
-        public double getWheelCircumference() {
-            return this.wheelDiameter * Math.PI;
+        public double getWheelCircumference(Distance unit) {
+            return unit.fromBaseUnits(this.wheelDiameter * Math.PI);
         }
 
-        public double getWheelDiameter() {
-            return this.wheelDiameter;
+        public double getWheelDiameter(Distance unit) {
+            return unit.fromBaseUnits(this.wheelDiameter);
         }
 
-        public double getWheelRadius() {
-            return this.wheelDiameter / 2;
+        public double getWheelRadius(Distance unit) {
+            return unit.fromBaseUnits(this.wheelDiameter / 2);
         }
     }
 
     @Override
     public void initSendable(SendableBuilder builder) {
         builder.setSmartDashboardType("SwerveModule");
-        builder.addDoubleProperty("stateSpeed", this::getStateSpeed, null);
-        builder.addDoubleProperty("stateAngle", () -> this.getStateAngle().getDegrees(), null);
-        builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed() * 100, null);
-        builder.addDoubleProperty("actualAngle", () -> this.getActualAngle().getDegrees(), null);
-        builder.addDoubleProperty("magnetOffset", () -> this.cfg.absoluteEncoder.getOffset().getDegrees(), (double val) -> this.cfg.absoluteEncoder.setOffset(Rotation2d.fromDegrees(val)));
+        builder.addDoubleProperty("stateSpeed", () -> this.getStateSpeed(MetersPerSecond) * 100, null);
+        builder.addDoubleProperty("stateAngle", () -> this.getStateAngle(Degrees), null);
+        builder.addDoubleProperty("actualSpeed", () -> this.getActualSpeed(MetersPerSecond) * 100, null);
+        builder.addDoubleProperty("actualAngle", () -> this.getActualAngle(Degrees), null);
+        builder.addDoubleProperty("magnetOffset", () -> this.cfg.absoluteEncoder.getOffset(Degrees), (double val) -> this.cfg.absoluteEncoder.setOffset(val, Degrees));
         builder.addDoubleProperty("pControllerOutput", () -> {
-            double driveDifference = this.getStateSpeed()-this.getActualSpeed(); 
-            double driveSpeed = Math.abs(driveDifference) > 0.01 ? this.getActualSpeed()+Math.copySign(0.01, driveDifference) : this.getStateSpeed();
+            double driveDifference = this.getStateSpeed(MetersPerSecond)-this.getActualSpeed(MetersPerSecond); 
+            double driveSpeed = Math.abs(driveDifference) > 0.01 ? this.getActualSpeed(MetersPerSecond)+Math.copySign(0.01, driveDifference) : this.getStateSpeed(MetersPerSecond);
             return driveSpeed;
         }, null);
         builder.addDoubleProperty("pivotOutput", () -> this.cfg.pivotMotor.get(), null);
         builder.addDoubleProperty("driveOutput", () -> this.cfg.driveMotor.get(), null);
-        builder.addDoubleProperty("totalDistance", this::getTotalDistance, null);
+        builder.addDoubleProperty("totalDistance", () -> this.getTotalDistance(Meters), null);
     }
 }

@@ -3,35 +3,75 @@ package frc.robot.swerve;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.signals.AbsoluteSensorRangeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
+
+import static edu.wpi.first.units.Units.Rotations;
+import static edu.wpi.first.units.Units.RotationsPerSecond;
+
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 
 
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.units.Angle;
+import edu.wpi.first.units.Velocity;
 
+/** An interface for encoders used on swerve drive modules.
+ * 
+ */
 public interface SwerveEncoder {
-    /** Returns the absolute position of this encoder, in radians, if it supports absolute positioning. Otherwise, this is the same as getPosition. */
-    public double getAbsolutePosition();
-    /** Returns the relative position of this encoder, in radians. */
-    public double getPosition();
-    /** Returns the velocity reported by the encoder, in radians per second. */
-    public double getVelocity();
-    /** Sets the relative position of this encoder to the given radian value. */
-    public void setPosition(double position);
+
+    /** Returns the absolute position of this encoder if it supports absolute positioning. Otherwise, this is the same as {@link #getPosition(Angle)}.
+     * @param unit The angle unit to convert the measurement into.
+     * @return The absolute position (or relative if this encoder doesn't support it) reported by this encoder.
+    */
+    public double getAbsolutePosition(Angle unit);
+
+    /** Returns the relative position of this encoder. 
+     * @param unit The angle unit to convert the measurement into.
+     * @return The relative position reported by this encoder.
+    */
+    public double getPosition(Angle unit);
+
+    /** Returns the velocity reported by this encoder. 
+     * @param unit The angular velocity unit to convert the measurement into.
+     * @return The angular velocity reported by this encoder.
+    */
+    public double getVelocity(Velocity<Angle> unit);
+
+    /** Sets the relative position that this encoder considers zero.
+     * @param position The angle to set this encoder's zero to.
+     * @param unit The angle unit to convert the measurement from.
+    */
+    public void setPosition(double position, Angle unit);
+
     /** Sets the relative position of this encoder to match up with the absolute position, if it supports absolute position. Otherwise, nothing happens. */
     public void setPositionToAbsolute();
-    /** Sets the absolute offset of this encoder. */
-    public void setOffset(Rotation2d offset);
-    /** Returns the absolute offset of this encoder. */
-    public Rotation2d getOffset();
-    /** Sets whether the output of the encoder are to be reversed. */
+
+    /** Sets the absolute offset of this encoder. 
+     * @param offset The angle to offset the absolute position reported by this encoder by.
+     * @param unit The angle unit to convert the measurement from.
+    */
+    public void setOffset(double offset, Angle unit);
+
+    /** Returns the absolute offset of this encoder. 
+     * @param unit The angle unit to convert the measurement into.
+     * @return The angle that the absolute position reported by this encoder is offset by.
+    */
+    public double getOffset(Angle unit);
+
+    /** Sets whether the output of this encoder is to be reversed. 
+     * @param reverse Whether the encoder should measure clockwise as positive instead of negative.
+    */
     public void setReversed(boolean reverse);
-    /** Returns whether this encoder supports absolute positioning. */
+
+    /** Returns whether this encoder supports absolute positioning. 
+     * @return Whether the encoder will report unique values for {@link #getAbsolutePosition(Angle)}.
+    */
     public boolean isAbsolute();
 
+    /** An implementation of {@link SwerveEncoder} for CTRE CANCoders. */
     public static class CANCoderSwerveEncoder implements SwerveEncoder {
         private CANcoder encoder;
         private CANcoderConfiguration config;
-        private static final double conversionFactor = (2 * Math.PI);
 
         public CANCoderSwerveEncoder(int id, Rotation2d offset, boolean reverse) {
             this.config = new CANcoderConfiguration();
@@ -45,23 +85,23 @@ public interface SwerveEncoder {
         }
 
         @Override
-        public double getAbsolutePosition() {
-            return this.encoder.getAbsolutePosition().getValueAsDouble() * conversionFactor;
+        public double getAbsolutePosition(Angle unit) {
+            return unit.convertFrom(this.encoder.getAbsolutePosition().getValueAsDouble(), Rotations);
         }
 
         @Override
-        public double getPosition() {
-            return this.encoder.getPosition().getValueAsDouble() * conversionFactor;
+        public double getPosition(Angle unit) {
+            return unit.convertFrom(this.encoder.getPosition().getValueAsDouble(), Rotations);
         }
 
         @Override
-        public double getVelocity() {
-            return this.encoder.getVelocity().getValueAsDouble() * conversionFactor;
+        public double getVelocity(Velocity<Angle> unit) {
+            return unit.convertFrom(this.encoder.getVelocity().getValueAsDouble(), RotationsPerSecond);
         }
 
         @Override
-        public void setPosition(double position) {
-            this.encoder.setPosition(position / conversionFactor);
+        public void setPosition(double position, Angle unit) {
+            this.encoder.setPosition(Rotations.convertFrom(position, unit));
         }
 
         @Override
@@ -70,8 +110,8 @@ public interface SwerveEncoder {
         }
 
         @Override
-        public void setOffset(Rotation2d offset) {
-            this.config.MagnetSensor.MagnetOffset = offset.getRotations();
+        public void setOffset(double offset, Angle unit) {
+            this.config.MagnetSensor.MagnetOffset = Rotations.convertFrom(offset, unit);
             this.encoder.getConfigurator().apply(this.config);
         }
 
@@ -82,8 +122,8 @@ public interface SwerveEncoder {
         }
 
         @Override
-        public Rotation2d getOffset() {
-            return Rotation2d.fromRotations(this.config.MagnetSensor.MagnetOffset);
+        public double getOffset(Angle unit) {
+            return unit.convertFrom(this.config.MagnetSensor.MagnetOffset, Rotations);
         }
 
         @Override

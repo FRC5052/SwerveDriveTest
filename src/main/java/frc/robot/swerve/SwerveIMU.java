@@ -1,19 +1,37 @@
 package frc.robot.swerve;
 
+import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Gs;
+import static edu.wpi.first.units.Units.Radians;
+
 import com.kauailabs.navx.frc.AHRS;
 
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.units.Angle;
+import edu.wpi.first.units.Distance;
+import edu.wpi.first.units.Units;
+import edu.wpi.first.units.Velocity;
+import edu.wpi.first.wpilibj.I2C;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.SerialPort;
 
 public interface SwerveIMU {
+    /** Returns the 3d rotation of this IMU. */
     public Rotation3d getRotation();
-    public Rotation2d getHeading();
-    public Rotation2d getRawHeading();
-    public Rotation2d getCompassHeading();
-    public Translation3d getWorldAccel();
+    /** Returns the heading of this IMU in the given unit, with heading correction applied. */
+    public double getHeading(Angle unit);
+    /** Returns the heading of this IMU in the given unit, without heading correction. */
+    public double getRawHeading(Angle unit);
+    /** Returns the heading of this IMU relative to the planet's magnetic field (if present), in the given unit. 
+     * 
+     * Note that on some implementations, the IMU has to be 
+     */
+    public double getCompassHeading(Angle unit);
+    public Translation3d getWorldAccel(Velocity<Velocity<Distance>> unit);
     public void calibrate();
     public void zeroHeading();
-    public Rotation2d getHeadingOffset();
-    public void setHeadingOffset(Rotation2d offset);
+    public double getHeadingOffset(Angle unit);
+    public void setHeadingOffset(Angle unit, double offset);
     // public void syncHeadingToMagnet();
     
     public class NavXSwerveIMU implements SwerveIMU {
@@ -23,37 +41,49 @@ public interface SwerveIMU {
             this.navX = new AHRS();
         }
 
+        public NavXSwerveIMU(SPI.Port port) {
+            this.navX = new AHRS(port);
+        }
+
+        public NavXSwerveIMU(I2C.Port port) {
+            this.navX = new AHRS(port);
+        }
+
+        public NavXSwerveIMU(SerialPort.Port port) {
+            this.navX = new AHRS(port);
+        }
+
         @Override
         public Rotation3d getRotation() {
             return new Rotation3d(new Quaternion(
-                this.navX.getQuaternionW(), 
-                this.navX.getQuaternionX(), 
-                this.navX.getQuaternionY(), 
-                this.navX.getQuaternionZ()
+                (double)this.navX.getQuaternionW(), 
+                (double)this.navX.getQuaternionX(), 
+                (double)this.navX.getQuaternionY(), 
+                (double)this.navX.getQuaternionZ()
             ));
         }
 
         @Override
-        public Rotation2d getHeading() {
-            return Rotation2d.fromDegrees((double)this.navX.getFusedHeading()-this.navX.getAngleAdjustment());
+        public double getHeading(Angle unit) {
+            return unit.convertFrom((double)this.navX.getFusedHeading()-this.navX.getAngleAdjustment(), Degrees);
         }
 
         @Override
-        public Rotation2d getRawHeading() {
-            return this.getHeading().plus(this.getHeadingOffset());
+        public double getRawHeading(Angle unit) {
+            return this.getHeading(unit) + this.getHeadingOffset(unit);
         }
 
         @Override
-        public Rotation2d getCompassHeading() {
-            return Rotation2d.fromDegrees((double)this.navX.getCompassHeading());
+        public double getCompassHeading(Angle unit) {
+            return unit.convertFrom((double)this.navX.getCompassHeading(), Degrees);
         }
 
         @Override
-        public Translation3d getWorldAccel() {
+        public Translation3d getWorldAccel(Velocity<Velocity<Distance>> unit) {
             return new Translation3d(
-                this.navX.getWorldLinearAccelX(), 
-                this.navX.getWorldLinearAccelY(), 
-                this.navX.getWorldLinearAccelZ()
+                unit.convertFrom(this.navX.getWorldLinearAccelX(), Gs), 
+                unit.convertFrom(this.navX.getWorldLinearAccelY(), Gs), 
+                unit.convertFrom(this.navX.getWorldLinearAccelZ(), Gs)
             );
         }
 
@@ -64,17 +94,17 @@ public interface SwerveIMU {
 
         @Override
         public void zeroHeading() {
-            this.setHeadingOffset(this.getRawHeading());
+            this.setHeadingOffset(Radians, this.getRawHeading(Radians));
         }
 
         @Override
-        public Rotation2d getHeadingOffset() {
-            return Rotation2d.fromDegrees(this.navX.getAngleAdjustment());
+        public double getHeadingOffset(Angle unit) {
+            return unit.convertFrom(this.navX.getAngleAdjustment(), Degrees);
         }
 
         @Override
-        public void setHeadingOffset(Rotation2d offset) {
-            this.navX.setAngleAdjustment(offset.getDegrees());
+        public void setHeadingOffset(Angle unit, double offset) {
+            this.navX.setAngleAdjustment(Degrees.convertFrom(offset, unit));
         }        
     }
 }

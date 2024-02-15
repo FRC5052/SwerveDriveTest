@@ -1,14 +1,18 @@
 package frc.robot.swerve;
 
+import static edu.wpi.first.units.Units.*;
+
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.CANSparkBase.IdleMode;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.units.Angle;
+import edu.wpi.first.units.Current;
+import edu.wpi.first.units.Velocity;
 
 public interface SwerveMotor {
     /** Returns the maximum speed in radians per second */
-    public double maxSpeed();
+    public double maxSpeed(Velocity<Angle> unit);
     /** Gets the normalized throttle of the motor. */
     public double get();
     /** Sets the normalized throttle of the motor. */
@@ -18,19 +22,19 @@ public interface SwerveMotor {
     /** Inverts the motor's output according to the given value. */
     public void setReversed(boolean reverse);
     /** Returns the motor's current power draw, in amps. */
-    public double getCurrent();
+    public double getCurrent(Current unit);
     /** Sets the motor's current limit to the given amp value. */
-    public void setCurrentLimit(int limit);
+    public void setCurrentLimit(double limit, Current unit);
     /** Returns the current position reported by the motor since last being reset, in radians. */
-    public double getPosition();
+    public double getPosition(Angle unit);
     /** Resets the position reported by the motor to the given radian value. */
-    public void resetPosition(double position);
+    public void resetPosition(double position, Angle unit);
     /** Resets the position reported by the motor to zero. */
     public default void resetPosition() {
-        this.resetPosition(0);
+        this.resetPosition(0, Radians);
     }
     /** Returns the current velocity reported by the motor, in radians per second. */
-    public double getVelocity();
+    public double getVelocity(Velocity<Angle> unit);
 
     public static class CANSparkMaxSwerveMotor implements SwerveMotor {
         private CANSparkMax motor;
@@ -39,8 +43,6 @@ public interface SwerveMotor {
             this.motor = new CANSparkMax(id, MotorType.kBrushless);
             this.motor.setInverted(reversed);
             this.motor.setIdleMode(idleMode);
-            this.motor.getEncoder().setPositionConversionFactor(2 * Math.PI);
-            this.motor.getEncoder().setVelocityConversionFactor((2 * Math.PI) / 60.0);
         }
 
         @Override
@@ -59,18 +61,18 @@ public interface SwerveMotor {
         }
 
         @Override
-        public void setCurrentLimit(int limit) {
-            this.motor.setSmartCurrentLimit(limit);
+        public void setCurrentLimit(double limit, Current unit) {
+            this.motor.setSmartCurrentLimit((int)Amps.convertFrom((double)limit, unit));
         }
 
         @Override
-        public double getPosition() {
-            return this.motor.getEncoder().getPosition();
+        public double getPosition(Angle unit) {
+            return unit.convertFrom(this.motor.getEncoder().getPosition(), Rotations);
         }
 
         @Override
-        public double getVelocity() {
-            return this.motor.getEncoder().getVelocity();
+        public double getVelocity(Velocity<Angle> unit) {
+            return unit.convertFrom(this.motor.getEncoder().getVelocity(), RPM);
         }
 
         @Override
@@ -79,18 +81,18 @@ public interface SwerveMotor {
         }
 
         @Override
-        public double getCurrent() {
-            return this.motor.getOutputCurrent();
+        public double getCurrent(Current unit) {
+            return unit.convertFrom(this.motor.getOutputCurrent(), Amps);
         }
 
         @Override
-        public void resetPosition(double position) {
-            this.motor.getEncoder().setPosition(position);
+        public void resetPosition(double position, Angle unit) {
+            this.motor.getEncoder().setPosition(Rotations.convertFrom(position, unit));
         }
 
         @Override
-        public double maxSpeed() {
-            return Units.rotationsPerMinuteToRadiansPerSecond(5820);
+        public double maxSpeed(Velocity<Angle> unit) {
+            return unit.convertFrom(5820, RPM);
         }
     }
 }

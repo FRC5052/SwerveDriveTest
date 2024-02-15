@@ -1,15 +1,23 @@
 package frc.robot.swerve;
 
+import static edu.wpi.first.units.Units.*;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
+import edu.wpi.first.math.kinematics.SwerveDriveWheelPositions;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.kinematics.SwerveDriveKinematics.SwerveDriveWheelStates;
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructArrayPublisher;
+import edu.wpi.first.units.Angle;
+import edu.wpi.first.units.Distance;
+import edu.wpi.first.units.MutableMeasure;
+import edu.wpi.first.units.Velocity;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
@@ -23,15 +31,23 @@ public class SwerveDrive implements Sendable {
     private SwerveModule[] modules;
     private SwerveIMU imu;
     private Pose2d pose;
-    private Rotation2d headingSetpoint;
-    private Translation2d oldPosition;
-    private Translation2d positionSetpoint;
-    private Translation2d currentVelocity;
-    private Field2d field;
-    private boolean poseOverriden;
-    private double maxDriveSpeed, maxTurnSpeed;
-    private PIDController globalDriveController, globalPivotController, turnController;
+    private Rotation2d headingSetpoint = new Rotation2d();
+    private Pose2d startPose = new Pose2d();
+    private Pose2d endPose = new Pose2d();
+    private Field2d field = new Field2d();
+    private boolean poseOverriden = false;
+    private MutableMeasure<Velocity<Distance>> maxDriveSpeed = MutableMeasure.zero(MetersPerSecond);
+    private MutableMeasure<Velocity<Angle>> maxTurnSpeed = MutableMeasure.zero(RadiansPerSecond);
+    private PIDController globalDriveController = new PIDController(0, 0, 0), globalPivotController = new PIDController(0, 0, 0), turnController = new PIDController(0, 0, 0);
     private boolean fieldCentric;
+    private ChassisSpeeds actualChassisSpeeds = new ChassisSpeeds();
+    private SwerveModuleState[] wheelStates;
+    private SwerveModuleState[] actualWheelStates;
+    private SwerveModulePosition[] wheelPositions;
+
+    // public static final Struct<SwerveDrive> struct = new Struct<SwerveDrive>() {
+        
+    // };
 
     public enum HeadingControlMode {
         // Value is to be interpreted as raw speed.
@@ -60,31 +76,29 @@ public class SwerveDrive implements Sendable {
         this.modules = modules;
         this.pose = initialPose;
         Translation2d[] positions = new Translation2d[this.modules.length];
-        SwerveModulePosition[] modulePositions = new SwerveModulePosition[this.modules.length];
+
+        this.wheelPositions = new SwerveModulePosition[this.modules.length];
+        this.actualWheelStates = new SwerveModuleState[this.modules.length];
         for (int i = 0; i < this.modules.length; i++) {
             positions[i] = this.modules[i].getModulePosition();
-            modulePositions[i] = new SwerveModulePosition(0, this.modules[i].getActualAngle());
-            SmartDashboard.putData("swerveDrive/modules/" + i, this.modules[i]);
+            this.wheelPositions[i] = new SwerveModulePosition(0, Rotation2d.fromRadians(this.modules[i].getActualAngle(Radians)));
+            this.actualWheelStates[i] = new SwerveModuleState();
+            SmartDashboard.putData("swerveDrive/modules/module" + i, this.modules[i]);
         } 
         this.kinematics = new SwerveDriveKinematics(positions);
         this.odometry = new SwerveDriveOdometry(
             this.kinematics, 
-            this.imu.getHeading(), 
-            modulePositions, 
+            new Rotation2d(this.imu.getHeading(Radians)), 
+            this.wheelPositions, 
             this.pose
         );
-        this.headingSetpoint = new Rotation2d();
-        this.field = new Field2d();
         this.field.setRobotPose(this.pose);
-        this.globalDriveController = new PIDController(0, 0, 0);
-        this.globalPivotController = new PIDController(0, 0, 0);
-        this.turnController = new PIDController(0, 0, 0);
+        this.imu.zeroHeading();
         SmartDashboard.putData("field", this.field);
         SmartDashboard.putData("swerveDrive/drivePID", this.globalDriveController);
         SmartDashboard.putData("swerveDrive/pivotPID", this.globalPivotController);
         SmartDashboard.putData("swerveDrive/turnPID", this.turnController);
         SmartDashboard.putData("swerveDrive", this);
-        this.imu.zeroHeading();
     }
 
     public void setFieldCentric(boolean fieldCentric) {
@@ -95,36 +109,40 @@ public class SwerveDrive implements Sendable {
         return this.fieldCentric;
     }
 
-    public void setMaxDriveSpeed(double speed) {
-        this.maxDriveSpeed = speed;
+    public void setMaxDriveSpeed(double speed, Velocity<Distance> unit) {
+        this.maxDriveSpeed.mut_replace(speed, unit);
     }
     
-    public void setMaxTurnSpeed(double speed) {
-        this.maxTurnSpeed = speed;
+    public void setMaxTurnSpeed(double speed, Velocity<Angle> unit) {
+        this.maxTurnSpeed.mut_replace(speed, unit);
     }
 
-    public double getMaxDriveSpeed() {
-        return this.maxDriveSpeed;
+    public double getMaxDriveSpeed(Velocity<Distance> unit) {
+        return this.maxDriveSpeed.in(unit);
     }
 
-    public double getMaxTurnSpeed() {
-        return this.maxTurnSpeed;
+    public double getMaxTurnSpeed(Velocity<Angle> unit) {
+        return this.maxTurnSpeed.in(unit);
     }
 
     public void setSpeeds(double x, double y, Rotation2d h, HeadingControlMode mode) {
+        if (this.endPose != null) {
+            x = interpolate(this.startPose.getX(), this.endPose.getX(), this.pose.getX()); 
+            y = interpolate(this.startPose.getY(), this.endPose.getY(), this.pose.getY());
+            h = new Rotation2d(interpolate(
+                MathUtil.angleModulus(this.startPose.getRotation().getRadians()), 
+                MathUtil.angleModulus(this.endPose.getRotation().getRadians()), 
+                MathUtil.angleModulus(this.pose.getRotation().getRadians())
+            ));
 
-        if (this.positionSetpoint != null) {
-            x = querp(this.oldPosition.getX(), this.positionSetpoint.getX(), this.pose.getX()); 
-            y = querp(this.oldPosition.getY(), this.positionSetpoint.getY(), this.pose.getY());
-            h = new Rotation2d();
-            System.out.println(x + " " + y);
+            System.out.println(x + " " + y + " " + h.getRadians());
+
             mode = HeadingControlMode.kSpeedOnly;
-            if (Math.abs(x) <= 0.05 && Math.abs(y) <= 0.05) {
+            if (this.pose.getTranslation().getDistance(this.endPose.getTranslation()) < 0.001) {
                 this.cancelMove();
             }
             
         } else {
-            h = h.unaryMinus().times(maxTurnSpeed / 2);
             x = -x;
             y = -y;
 
@@ -141,7 +159,7 @@ public class SwerveDrive implements Sendable {
             }
 
             if (mode.requiresControlLoop()) {
-                h = Rotation2d.fromRotations(this.turnController.calculate(this.imu.getHeading().minus(this.headingSetpoint).getRotations(), 0.0)).unaryMinus();
+                h = Rotation2d.fromRotations(this.turnController.calculate(this.imu.getHeading(Rotations), this.headingSetpoint.getRotations())).unaryMinus();
             }
         }
         
@@ -150,9 +168,9 @@ public class SwerveDrive implements Sendable {
         h = Rotation2d.fromRotations(MathUtil.clamp(h.getRotations(), -1.0, 1.0));
 
         if (this.fieldCentric) {
-            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x * maxDriveSpeed, y * maxDriveSpeed, h.times(maxTurnSpeed).getRadians(), this.imu.getHeading().unaryMinus());
+            this.speeds = ChassisSpeeds.fromFieldRelativeSpeeds(x * this.maxDriveSpeed.in(MetersPerSecond), y * this.maxDriveSpeed.in(MetersPerSecond), h.getRadians() * this.maxTurnSpeed.in(RadiansPerSecond), new Rotation2d(this.imu.getHeading(Radians)).unaryMinus());
         } else {
-            this.speeds = new ChassisSpeeds(x * maxDriveSpeed, y * maxDriveSpeed, h.times(maxTurnSpeed).getRadians());
+            this.speeds = new ChassisSpeeds(x * this.maxDriveSpeed.in(MetersPerSecond), y * this.maxDriveSpeed.in(MetersPerSecond), h.getRadians() * this.maxTurnSpeed.in(RadiansPerSecond));
         }
     }
 
@@ -178,6 +196,7 @@ public class SwerveDrive implements Sendable {
         this.turnController.setP(controller.getP());
         this.turnController.setI(controller.getI());
         this.turnController.setD(controller.getD());
+        this.turnController.enableContinuousInput(-0.5, 0.5);
     }
 
     public PIDController getGlobalDrivePID() {
@@ -203,80 +222,112 @@ public class SwerveDrive implements Sendable {
         this.poseOverriden = true;
     }
 
+    public void poseTo(Pose2d newPose) {
+        this.endPose = newPose;
+        this.startPose = new Pose2d(this.pose.getX(), this.pose.getY(), new Rotation2d(this.pose.getRotation().getRadians()));
+    }
+
     public void moveTo(Translation2d pos) {
-        this.positionSetpoint = new Translation2d(pos.getX(), pos.getY());
-        this.oldPosition = new Translation2d(this.pose.getX(), this.pose.getY());
+        this.poseTo(new Pose2d(pos, new Rotation2d(this.pose.getRotation().getRadians())));
     }
 
     public void moveBy(Translation2d off) {
-        this.moveTo(new Translation2d(this.pose.getX()+off.getX(), this.pose.getY()+off.getY()));
-        System.out.println(this.positionSetpoint);
-        System.out.println(this.oldPosition);
-        System.out.println(this.pose);
+        this.moveTo(this.pose.getTranslation().plus(off));
+    }
+
+    public void rotateTo(Rotation2d heading) {
+        this.poseTo(new Pose2d(new Translation2d(this.pose.getX(), this.pose.getY()), heading));
+    }
+
+    public void rotateBy(Rotation2d angle) {
+        this.rotateTo(this.pose.getRotation().plus(angle));
     }
 
     public void cancelMove() {
-        System.out.println("Stopped");
-        this.positionSetpoint = null;
-        this.oldPosition = null;
+        this.endPose = null;
+        this.startPose = null;
     }
 
-    public Translation2d getVelocityVector() {
-        if (this.currentVelocity != null) return this.currentVelocity;
-        Translation2d velocity = new Translation2d();
-        for (SwerveModule module : this.modules) {
-            velocity = velocity.plus(module.getVelocityVector());
-        }
-        return velocity.div((double)this.modules.length).rotateBy(this.imu.getHeading());
+    public Translation2d getDriveVelocityVector(Velocity<Distance> unit) {
+       return new Translation2d(unit.convertFrom(this.actualChassisSpeeds.vxMetersPerSecond, MetersPerSecond), unit.convertFrom(this.actualChassisSpeeds.vyMetersPerSecond, MetersPerSecond));
     }
 
-    private double querp(double start, double end, double x) {
+    public double getXVelocity(Velocity<Distance> unit) {
+        return unit.convertFrom(this.actualChassisSpeeds.vxMetersPerSecond, MetersPerSecond);
+    }
 
-        x -= start;
-        end -= start;
-        double a = Math.copySign(1.0, end) * x;
-        if (end == 0 || a < 0 || a > Math.abs(end)) return 0.0; 
-        else return -Math.copySign(1.0, end) * (((4 / Math.pow(end, 2)) * x * (x - end) * 0.95) - 0.05);
+    public double getYVelocity(Velocity<Distance> unit) {
+        return unit.convertFrom(this.actualChassisSpeeds.vyMetersPerSecond, MetersPerSecond);
+    }
+
+    public double getTurnVelocity(Velocity<Angle> unit) {
+        return unit.convertFrom(this.actualChassisSpeeds.omegaRadiansPerSecond, RadiansPerSecond);
+    }
+
+    private static double interpolate(double start, double end, double x) {
+        if (Math.abs(x-start) < 0.0 || Math.abs(x-start) >= Math.abs(end-start)*1.25) return 0;
+        return Math.copySign(MathUtil.clamp(1.0 - Math.pow((Math.abs(end-start) - Math.abs(x-start)), 2), -0.5, 1.0), end-start) / 2;
+        // x -= start;
+        // end -= start;
+        // double a = Math.copySign(1.0, end) * x;
+        // if (end == 0 || a < 0 || a > Math.abs(end)) return 0.0; 
+        // else return (1.0 / (
+        //     x - (end + Math.copySign(1.0, end))
+        // )) + Math.copySign((
+        //     1.0 /* + 1.0 / (Math.abs(end) + 1)*/
+        // ), end);
     }
 
     public void update() {
         
-
-        SwerveModuleState[] states = this.kinematics.toSwerveModuleStates(this.speeds);
-        SwerveModulePosition[] modulePositions = new SwerveModulePosition[this.modules.length];
+        this.wheelStates = this.kinematics.toSwerveModuleStates(this.speeds);
         for (int i = 0; i < this.modules.length; i++) {
-            this.modules[i].setState(states[i]);
-            modulePositions[i] = new SwerveModulePosition(this.modules[i].getTotalDistance(), this.modules[i].getActualAngle());
+            this.modules[i].setState(this.wheelStates[i]);
             this.modules[i].update();
-        } 
+            this.wheelPositions[i] = new SwerveModulePosition(this.modules[i].getTotalDistance(Meters), this.modules[i].getActualAngle());
+            this.actualWheelStates[i] = this.modules[i].getActualState();
+        }
+
+        this.actualChassisSpeeds = this.kinematics.toChassisSpeeds(this.actualWheelStates);
+
         if (this.poseOverriden) {
             this.odometry.resetPosition(
-                this.imu.getHeading(), 
-                modulePositions, 
+                new Rotation2d(this.imu.getHeading(Radians)), 
+                this.wheelPositions, 
                 this.pose
             );
+            this.poseOverriden = false;
         } else {
             this.pose = this.odometry.update(
-                this.imu.getHeading(), 
-                modulePositions    
+                new Rotation2d(this.imu.getHeading(Radians)), 
+                this.wheelPositions    
             );
         }
         this.field.setRobotPose(this.pose);
-        this.currentVelocity = null;
+        System.out.println(this.pose);
     }
 
     @Override
     public void initSendable(SendableBuilder builder) {
         builder.setSmartDashboardType("SwerveDrive");
-        builder.addDoubleProperty("imu/heading", () -> this.imu.getHeading().getDegrees(), null);
-        builder.addDoubleProperty("imu/rawHeading", () -> this.imu.getRawHeading().getDegrees(), null);
+        builder.addDoubleProperty("imu/heading", () -> this.imu.getHeading(Degrees), null);
+        builder.addDoubleProperty("imu/rawHeading", () -> this.imu.getRawHeading(Degrees), null);
         builder.addDoubleProperty("imu/headingSetpoint", () -> this.headingSetpoint.getDegrees(), null);
-        builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading().getDegrees(), null);
-        builder.addDoubleProperty("imu/headingOffset", () -> this.imu.getHeadingOffset().getDegrees(), (double offset) -> this.imu.setHeadingOffset(Rotation2d.fromDegrees(offset)));
-        builder.addDoubleProperty("imu/velocity/x", () -> this.getVelocityVector().getX(), null);
-        builder.addDoubleProperty("imu/velocity/y", () -> this.getVelocityVector().getY(), null);
-        builder.addDoubleProperty("imu/velocity/norm", () -> this.getVelocityVector().getNorm(), null);
-        builder.addDoubleProperty("imu/velocity/angle", () -> this.getVelocityVector().getAngle().getDegrees(), null);
+        builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading(Degrees), null);
+        builder.addDoubleProperty("imu/headingOffset", () -> this.imu.getHeadingOffset(Degrees), (double offset) -> this.imu.setHeadingOffset(Degrees, offset));
+        builder.addDoubleProperty("imu/velocity/x", () -> this.getDriveVelocityVector(MetersPerSecond).getX(), null);
+        builder.addDoubleProperty("imu/velocity/y", () -> this.getDriveVelocityVector(MetersPerSecond).getY(), null);
+        builder.addDoubleProperty("imu/velocity/norm", () -> this.getDriveVelocityVector(MetersPerSecond).getNorm(), null);
+        builder.addDoubleProperty("imu/velocity/angle", () -> this.getDriveVelocityVector(MetersPerSecond).getAngle().getDegrees(), null);
+        builder.addDoubleArrayProperty("modules/actualStates", () -> {
+            double[] vals = new double[this.actualWheelStates.length << 1];
+            for (int i = 0; i < this.actualWheelStates.length; i++) {
+                vals[(i << 1)] = this.actualWheelStates[i].angle.getDegrees();
+                vals[(i << 1) + 1] = this.actualWheelStates[i].speedMetersPerSecond;
+            }
+            return vals;
+        }, null);
+        
     }
 
     
