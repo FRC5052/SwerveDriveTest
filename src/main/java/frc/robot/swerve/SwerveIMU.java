@@ -24,14 +24,14 @@ public interface SwerveIMU {
     public double getRawHeading(Angle unit);
     /** Returns the heading of this IMU relative to the planet's magnetic field (if present), in the given unit. 
      * 
-     * Note that on some implementations, the IMU has to be 
+     * Note that on some implementations, the IMU has to be calibrated manually for this function to work correctly.
      */
     public double getCompassHeading(Angle unit);
     public Translation3d getWorldAccel(Velocity<Velocity<Distance>> unit);
     public void calibrate();
     public void zeroHeading();
     public double getHeadingOffset(Angle unit);
-    public void setHeadingOffset(Angle unit, double offset);
+    public void setHeadingOffset(double offset, Angle unit);
     // public void syncHeadingToMagnet();
     
     public class NavXSwerveIMU implements SwerveIMU {
@@ -94,7 +94,7 @@ public interface SwerveIMU {
 
         @Override
         public void zeroHeading() {
-            this.setHeadingOffset(Radians, this.getRawHeading(Radians));
+            this.setHeadingOffset(this.getRawHeading(Radians), Radians);
         }
 
         @Override
@@ -103,7 +103,7 @@ public interface SwerveIMU {
         }
 
         @Override
-        public void setHeadingOffset(Angle unit, double offset) {
+        public void setHeadingOffset(double offset, Angle unit) {
             this.navX.setAngleAdjustment(Degrees.convertFrom(offset, unit));
         }        
     }

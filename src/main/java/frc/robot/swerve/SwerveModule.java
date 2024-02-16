@@ -2,6 +2,7 @@ package frc.robot.swerve;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -22,6 +23,7 @@ public class SwerveModule implements Sendable {
 
     private Rotation2d actualAngle;
     private Translation2d velocityVector;
+    private LinearFilter angleFilter;
 
     /*
      * Constructs a
@@ -31,8 +33,20 @@ public class SwerveModule implements Sendable {
         this.state = new SwerveModuleState(0, Rotation2d.fromDegrees(0));
         this.actualAngle = new Rotation2d();
         this.velocityVector = new Translation2d();
+        this.angleFilter = LinearFilter.movingAverage(5);
     }
 
+    public SwerveMotor getDriveMotor() {
+        return this.cfg.driveMotor;
+    }
+
+    public SwerveMotor getPivotMotor() {
+        return this.cfg.pivotMotor;
+    }
+
+    public SwerveEncoder getEncoder() {
+        return this.cfg.absoluteEncoder;
+    }
 
     public void setDrivePID(PIDController controller, boolean clone) {
         this.cfg.driveController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
@@ -95,7 +109,7 @@ public class SwerveModule implements Sendable {
     }
 
     public double getActualAngle(Angle unit) {
-        return this.cfg.absoluteEncoder.getAbsolutePosition(unit);
+        return unit.convertFrom(this.actualAngle.getRadians(), Radians);
     }
 
     public Rotation2d getActualAngle() {
@@ -118,7 +132,7 @@ public class SwerveModule implements Sendable {
 
     // Returns the total distance traveled by the module's wheel in meters.
     public double getTotalDistance(Distance unit) {
-        return (this.cfg.driveMotor.getPosition(Radians) / this.cfg.driveGearRatio) * this.cfg.getWheelRadius(unit);
+        return (this.cfg.driveMotor.getPosition(Radians) * this.cfg.getWheelRadius(unit)) / this.cfg.driveGearRatio;
         // return this.cfg.driveMotor.getPosition() / (2*Math.PI);
     }
 
@@ -127,7 +141,7 @@ public class SwerveModule implements Sendable {
     }
 
     public void update() {
-        this.actualAngle = new Rotation2d(this.getActualAngle(Radians));
+        this.actualAngle = new Rotation2d(this.angleFilter.calculate(this.cfg.absoluteEncoder.getAbsolutePosition(Radians)));
         this.actualState = new SwerveModuleState(this.getActualSpeed(MetersPerSecond), this.actualAngle);
 
         if (this.cfg.driveMotor != null) {
@@ -193,7 +207,7 @@ public class SwerveModule implements Sendable {
         }
 
         public SwerveModuleConfig wheelDiameter(double diameter, Distance unit) {
-            this.wheelDiameter = unit.toBaseUnits(diameter);
+            this.wheelDiameter = Meters.convertFrom(diameter, unit);
             return this;
         }
 
@@ -223,15 +237,15 @@ public class SwerveModule implements Sendable {
         }
 
         public double getWheelCircumference(Distance unit) {
-            return unit.fromBaseUnits(this.wheelDiameter * Math.PI);
+            return unit.convertFrom(this.wheelDiameter, Meters) * Math.PI;
         }
 
         public double getWheelDiameter(Distance unit) {
-            return unit.fromBaseUnits(this.wheelDiameter);
+            return unit.convertFrom(this.wheelDiameter, Meters);
         }
 
         public double getWheelRadius(Distance unit) {
-            return unit.fromBaseUnits(this.wheelDiameter / 2);
+            return unit.convertFrom(this.wheelDiameter, Meters) / 2;
         }
     }
 

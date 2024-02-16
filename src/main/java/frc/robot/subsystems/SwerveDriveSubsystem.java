@@ -42,26 +42,26 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive = new SwerveDrive(
       new Pose2d(), 
       new SwerveIMU.NavXSwerveIMU(),
-      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
-        .position(new Translation2d(-23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kCoast))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(156.775), false))
-      ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
-        .position(new Translation2d(23.5, 23.5), Inches)
+        .position(new Translation2d(23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kCoast))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(-122.565), false))
       ),
+      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
+        .position(new Translation2d(23.5, 23.5), Inches)
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kCoast))
+        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(156.775), false))
+      ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
-        .position(new Translation2d(23.5, -23.5), Inches)
+        .position(new Translation2d(-23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, true, IdleMode.kCoast))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(126.33), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
-        .position(new Translation2d(-23.5, -23.5), Inches)
+        .position(new Translation2d(-23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kCoast))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-6.11), false))
@@ -70,9 +70,13 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setMaxDriveSpeed(12.5, MetersPerSecond);
     this.swerveDrive.setMaxTurnSpeed(2.0, RadiansPerSecond);
     this.swerveDrive.setGlobalDrivePID(new PIDController(0.05, 0.0, 0.0));
-    this.swerveDrive.setGlobalPivotPID(new PIDController(1.2, 0.0, 0.0));
+    this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
     this.swerveDrive.setTurnPID(new PIDController(5.0, 0, 0.2));
+    this.swerveDrive.setMovePID(new PIDController(0.05, 0, 0.0));
     this.swerveDrive.setFieldCentric(true);
+    for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
+      this.swerveDrive.getSwerveModule(i).getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
+    }
   }
 
   public void resetHeading() {
@@ -80,12 +84,12 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   }
 
   public void moveTo(Translation2d pos) {
-    this.swerveDrive.moveTo(pos);
+    this.swerveDrive.moveTo(pos.times(this.swerveDrive.getMaxDriveSpeed(MetersPerSecond) * 2));
   }
 
   public void moveBy(Translation2d off) {
     this.swerveDrive.setFieldCentric(false);
-    this.swerveDrive.moveBy(off);
+    this.swerveDrive.moveBy(off.times(this.swerveDrive.getMaxDriveSpeed(MetersPerSecond) * 2));
   }
 
   public void cancelMove() {
@@ -116,7 +120,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       x = Math.cos(angle);
       y = Math.sin(angle);
     }
-    this.swerveDrive.setSpeeds(
+    this.swerveDrive.drive(
       x, 
       y, 
       Rotation2d.fromRotations(Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3) * 0.5),
