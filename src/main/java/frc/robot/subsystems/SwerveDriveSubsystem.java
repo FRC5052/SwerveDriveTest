@@ -6,15 +6,21 @@ package frc.robot.subsystems;
 
 import static edu.wpi.first.units.Units.*;
 
+import java.util.ArrayList;
 import java.util.function.DoubleSupplier;
 
 import com.revrobotics.CANSparkBase.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.HolonomicDriveController;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.trajectory.Trajectory;
+import edu.wpi.first.math.trajectory.TrajectoryGenerator;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.swerve.SwerveDrive;
 import frc.robot.swerve.SwerveEncoder;
@@ -22,6 +28,8 @@ import frc.robot.swerve.SwerveIMU;
 import frc.robot.swerve.SwerveModule;
 import frc.robot.swerve.SwerveMotor;
 import frc.robot.swerve.SwerveDrive.HeadingControlMode;
+
+import static edu.wpi.first.math.trajectory.TrapezoidProfile.*;
 
 public class SwerveDriveSubsystem extends SubsystemBase {
   private SwerveDrive swerveDrive;
@@ -37,7 +45,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     SwerveModule.SwerveModuleConfig cfg = new SwerveModule.SwerveModuleConfig()
       .driveGearRatio(6.75)
       .pivotGearRatio(12.8)
-      .wheelDiameter(4.0, Inches)
+      .wheelDiameter(0.1016, Meters)
     ;
     this.swerveDrive = new SwerveDrive(
       new Pose2d(), 
@@ -67,12 +75,13 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-6.11), false))
       )
     );
-    this.swerveDrive.setMaxDriveSpeed(12.5, MetersPerSecond);
-    this.swerveDrive.setMaxTurnSpeed(2.0, RadiansPerSecond);
+    this.setFullSpeed(true);
     this.swerveDrive.setGlobalDrivePID(new PIDController(0.05, 0.0, 0.0));
     this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
-    this.swerveDrive.setTurnPID(new PIDController(5.0, 0, 0.2));
-    this.swerveDrive.setMovePID(new PIDController(0.05, 0, 0.0));
+    this.swerveDrive.setDriveController(
+      new PIDController(0.05, 0, 0.0), 
+      new PIDController(5.0, 0.0, 0.2)
+    );
     this.swerveDrive.setFieldCentric(true);
     for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
       this.swerveDrive.getSwerveModule(i).getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
@@ -84,26 +93,30 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   }
 
   public void moveTo(Translation2d pos) {
-    this.swerveDrive.moveTo(pos.times(this.swerveDrive.getMaxDriveSpeed(MetersPerSecond) * 2));
+    this.swerveDrive.moveTo(pos);
   }
 
   public void moveBy(Translation2d off) {
     this.swerveDrive.setFieldCentric(false);
-    this.swerveDrive.moveBy(off.times(this.swerveDrive.getMaxDriveSpeed(MetersPerSecond) * 2));
+    this.swerveDrive.moveBy(off);
   }
 
   public void cancelMove() {
-    this.swerveDrive.cancelMove();
+    this.swerveDrive.cancelTrajectory();
     this.swerveDrive.setFieldCentric(true);
   }
 
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
       this.swerveDrive.setMaxDriveSpeed(12.5, MetersPerSecond); // Full drive speed
-      this.swerveDrive.setMaxTurnSpeed(2.0, RadiansPerSecond); // Full turn speed
+      this.swerveDrive.setMaxTurnSpeed(1.0, RotationsPerSecond); // Full turn speed
+      this.swerveDrive.setMaxDriveAccel(1.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(20.0, RadiansPerSecond.per(Second));
     } else {
       this.swerveDrive.setMaxDriveSpeed(3.0, MetersPerSecond); // Non-full drive speed
       this.swerveDrive.setMaxTurnSpeed(1.5, RadiansPerSecond); // Non-full turn speed
+      this.swerveDrive.setMaxDriveAccel(0.5, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(10.0, RadiansPerSecond.per(Second));
     }
   }
 
@@ -123,7 +136,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.drive(
       x, 
       y, 
-      Rotation2d.fromRotations(Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3) * 0.5),
+      Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3),
       HeadingControlMode.kHeadingChange
     );
     this.swerveDrive.update();

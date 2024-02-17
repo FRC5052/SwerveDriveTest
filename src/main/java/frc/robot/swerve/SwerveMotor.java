@@ -43,6 +43,8 @@ public interface SwerveMotor {
             this.motor = new CANSparkMax(id, MotorType.kBrushless);
             this.motor.setInverted(reversed);
             this.motor.setIdleMode(idleMode);
+            this.motor.getEncoder().setPositionConversionFactor(1);
+            this.motor.getEncoder().setVelocityConversionFactor(1);
         }
 
         @Override

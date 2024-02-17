@@ -52,7 +52,7 @@ public class RobotContainer {
     instance = this;
 
     this.m_swerveDriveSubsystem = new SwerveDriveSubsystem(
-      () -> this.m_driverController.getRawAxis(1), 
+      () -> -this.m_driverController.getRawAxis(1), 
       () -> -this.m_driverController.getRawAxis(0), 
       () -> this.m_driverController.getRawAxis(2)
       );

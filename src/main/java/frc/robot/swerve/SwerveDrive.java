@@ -2,6 +2,8 @@ package frc.robot.swerve;
 
 import static edu.wpi.first.units.Units.*;
 
+import java.util.ArrayList;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.HolonomicDriveController;
 import edu.wpi.first.math.controller.PIDController;
@@ -14,6 +16,8 @@ import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.trajectory.Trajectory;
+import edu.wpi.first.math.trajectory.TrajectoryConfig;
+import edu.wpi.first.math.trajectory.TrajectoryGenerator;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
 import edu.wpi.first.units.Angle;
@@ -38,16 +42,16 @@ public class SwerveDrive implements Sendable {
     private MutableMeasure<Velocity<Distance>> targetXSpeed = MutableMeasure.zero(MetersPerSecond);
     private MutableMeasure<Velocity<Distance>> targetYSpeed = MutableMeasure.zero(MetersPerSecond);
     private MutableMeasure<Angle> targetHeading = MutableMeasure.zero(Radians);
-    private Rotation2d headingSetpoint = new Rotation2d();
     private Trajectory trajectory;
     private Timer pathTimer = new Timer();
     private Field2d field = new Field2d();
     private boolean poseOverriden = false;
     private MutableMeasure<Velocity<Distance>> maxDriveSpeed = MutableMeasure.zero(MetersPerSecond);
     private MutableMeasure<Velocity<Angle>> maxTurnSpeed = MutableMeasure.zero(RadiansPerSecond);
+    private MutableMeasure<Velocity<Velocity<Distance>>> maxDriveAccel = MutableMeasure.zero(MetersPerSecondPerSecond);
+    private MutableMeasure<Velocity<Velocity<Angle>>> maxTurnAccel = MutableMeasure.zero(RadiansPerSecond.per(Second));
     private PIDController moduleDriveController = new PIDController(0, 0, 0), modulePivotController = new PIDController(0, 0, 0);
     private HolonomicDriveController driveController = new HolonomicDriveController(new PIDController(0, 0, 0), new PIDController(0, 0, 0), new ProfiledPIDController(0, 0, 0, new TrapezoidProfile.Constraints(0, 0)));
-    private RamseteController trajectoryController = new RamseteController();
     private boolean fieldCentric;
     private ChassisSpeeds actualChassisSpeeds = new ChassisSpeeds();
     private SwerveModuleState[] wheelStates;
@@ -137,6 +141,14 @@ public class SwerveDrive implements Sendable {
         this.maxTurnSpeed.mut_replace(speed, unit);
     }
 
+    public void setMaxDriveAccel(double accel, Velocity<Velocity<Distance>> unit) {
+        this.maxDriveAccel.mut_replace(accel, unit);
+    }
+    
+    public void setMaxTurnAccel(double accel, Velocity<Velocity<Angle>> unit) {
+        this.maxTurnAccel.mut_replace(accel, unit);
+    }
+
     public double getMaxDriveSpeed(Velocity<Distance> unit) {
         return this.maxDriveSpeed.in(unit);
     }
@@ -145,21 +157,43 @@ public class SwerveDrive implements Sendable {
         return this.maxTurnSpeed.in(unit);
     }
 
+    public double getMaxDriveAccel(Velocity<Velocity<Distance>> unit) {
+        return this.maxDriveAccel.in(unit);
+    }
+
+    public double getMaxTurnAccel(Velocity<Velocity<Angle>> unit) {
+        return this.maxTurnAccel.in(unit);
+    }
+
+    public double getPoseX(Distance unit) {
+        return unit.convertFrom(this.pose.getX(), Meters);
+    }
+
+    public double getPoseY(Distance unit) {
+        return unit.convertFrom(this.pose.getY(), Meters);
+    }
+
+    public double getPoseAngle(Angle unit) {
+        return unit.convertFrom(this.pose.getRotation().getRadians(), Radians);
+    }
+
     public void drive(double x, double y, double h, HeadingControlMode mode) {
         x = MathUtil.clamp(x, -1.0, 1.0);
         y = MathUtil.clamp(y, -1.0, 1.0);
-        h = MathUtil.inputModulus(h, -1.0, 1.0);
+        h = MathUtil.clamp(h, -1.0, 1.0);
 
         this.targetXSpeed.mut_replace(this.maxDriveSpeed.times(x));
         this.targetYSpeed.mut_replace(this.maxDriveSpeed.times(y));
 
         switch (mode) {
             case kHeadingChange:
-                this.targetHeading.mut_plus(this.maxTurnSpeed.times(h).divide(Robot.kDefaultPeriod).magnitude(), this.maxTurnSpeed.unit().getUnit());
+                this.targetHeading.mut_plus(this.maxTurnSpeed.magnitude()*h*Robot.kDefaultPeriod, this.maxTurnSpeed.unit().getUnit());
                 break;
             case kHeadingSet:
-                this.targetHeading.mut_replace(h/2, Rotations);
+                this.targetHeading.mut_replace(h, Rotations);
                 break;
+            case kSpeedOnly:
+                this.targetHeading.mut_plus(h*Robot.kDefaultPeriod, Rotations);
             default:
                 break;
             
@@ -184,12 +218,17 @@ public class SwerveDrive implements Sendable {
         }
     }
 
-    public void setDriveController(HolonomicDriveController controller) {
-        this.driveController = controller;
-    }
-
-    public void setTrajectoryController(RamseteController controller) {
-        this.trajectoryController = controller;
+    public void setDriveController(PIDController xyController, PIDController turnController) {
+        this.driveController.getXController().setP(xyController.getP());
+        this.driveController.getXController().setI(xyController.getI());
+        this.driveController.getXController().setD(xyController.getD());
+        this.driveController.getYController().setP(xyController.getP());
+        this.driveController.getYController().setI(xyController.getI());
+        this.driveController.getYController().setD(xyController.getD());
+        this.driveController.getThetaController().setP(turnController.getP());
+        this.driveController.getThetaController().setI(turnController.getI());
+        this.driveController.getThetaController().setD(turnController.getD());
+        this.driveController.getThetaController().setConstraints(new Constraints(this.maxTurnSpeed, this.maxTurnAccel));
     }
 
     public PIDController getGlobalDrivePID() {
@@ -204,13 +243,9 @@ public class SwerveDrive implements Sendable {
         return this.driveController;
     }
 
-    public RamseteController getTrajectoryController() {
-        return this.trajectoryController;
-    }
-
     public void zeroHeading() {
         this.imu.zeroHeading();
-        this.headingSetpoint = new Rotation2d();
+        this.targetHeading.mut_setMagnitude(0);
         this.overridePosition(new Pose2d(new Translation2d(this.pose.getX(), this.pose.getY()), new Rotation2d()));
     }
 
@@ -222,11 +257,23 @@ public class SwerveDrive implements Sendable {
     public void followTrajectory(Trajectory trajectory) {
         this.trajectory = trajectory;
         this.pathTimer.restart();
-        System.out.println(this.trajectory);
     }
 
-    public void cancelMove() {
+    public void cancelTrajectory() {
         this.trajectory = null;
+    }
+
+    public void moveTo(Translation2d pos) {
+        this.followTrajectory(TrajectoryGenerator.generateTrajectory(
+            new Pose2d(new Translation2d(this.getPoseX(Meters), this.getPoseY(Meters)), new Rotation2d(this.getPoseAngle(Radians))), 
+            new ArrayList<>(), 
+            new Pose2d(pos, new Rotation2d(this.getPoseAngle(Radians))),
+            new TrajectoryConfig(this.maxDriveSpeed, this.maxDriveAccel)
+        ));
+    }
+
+    public void moveBy(Translation2d off) {
+        this.moveTo(this.pose.getTranslation().plus(off));
     }
 
     public Translation2d getDriveVelocityVector(Velocity<Distance> unit) {
@@ -249,15 +296,34 @@ public class SwerveDrive implements Sendable {
         if (this.trajectory != null) {
             var state = this.trajectory.sample(this.pathTimer.get());
             this.speeds = this.driveController.calculate(this.pose, state, new Rotation2d(this.targetHeading.in(Radians)));
+            System.out.println(this.pose.getTranslation());
+            if (state.timeSeconds >= this.trajectory.getTotalTimeSeconds()) {
+               this.cancelTrajectory(); 
+            }
+        } else {
+            var vector = new Translation2d(this.targetXSpeed.in(MetersPerSecond), this.targetYSpeed.in(MetersPerSecond));
+            this.speeds = this.driveController.calculate(this.pose, new Pose2d(
+                    this.pose.getX()+(vector.getX()*Robot.kDefaultPeriod), 
+                    this.pose.getY()+(vector.getY()*Robot.kDefaultPeriod), 
+                    vector.getAngle()
+                ), 
+                MathUtil.clamp(vector.getNorm(), -this.getMaxDriveSpeed(MetersPerSecond), this.getMaxDriveSpeed(MetersPerSecond)), 
+                new Rotation2d(this.targetHeading.in(Radians))
+            );
         }
+
+        this.speeds.omegaRadiansPerSecond = -this.speeds.omegaRadiansPerSecond;
 
         this.wheelStates = this.kinematics.toSwerveModuleStates(this.speeds);
         for (int i = 0; i < this.modules.length; i++) {
             this.modules[i].setState(this.wheelStates[i]);
             this.modules[i].update();
             this.wheelPositions[i] = new SwerveModulePosition(this.modules[i].getTotalDistance(Meters), this.modules[i].getActualAngle());
+            
             this.actualWheelStates[i] = this.modules[i].getActualState();
         }
+
+        System.out.println(this.wheelPositions[0].distanceMeters);
 
         this.actualChassisSpeeds = this.kinematics.toChassisSpeeds(this.actualWheelStates);
 
@@ -282,7 +348,7 @@ public class SwerveDrive implements Sendable {
         builder.setSmartDashboardType("SwerveDrive");
         builder.addDoubleProperty("imu/heading", () -> this.imu.getHeading(Degrees), null);
         builder.addDoubleProperty("imu/rawHeading", () -> this.imu.getRawHeading(Degrees), null);
-        builder.addDoubleProperty("imu/headingSetpoint", () -> this.headingSetpoint.getDegrees(), null);
+        builder.addDoubleProperty("imu/headingSetpoint", () -> this.targetHeading.in(Degrees), null);
         builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading(Degrees), null);
         builder.addDoubleProperty("imu/headingOffset", () -> this.imu.getHeadingOffset(Degrees), (double offset) -> this.imu.setHeadingOffset(offset, Degrees));
         builder.addDoubleProperty("imu/velocity/x", () -> this.getDriveVelocityVector(MetersPerSecond).getX(), null);

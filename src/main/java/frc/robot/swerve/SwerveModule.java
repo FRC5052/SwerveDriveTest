@@ -12,6 +12,7 @@ import static edu.wpi.first.units.Units.*;
 import edu.wpi.first.units.Angle;
 import edu.wpi.first.units.Distance;
 import edu.wpi.first.units.Measure;
+import edu.wpi.first.units.MutableMeasure;
 import edu.wpi.first.units.Velocity;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -23,7 +24,6 @@ public class SwerveModule implements Sendable {
 
     private Rotation2d actualAngle;
     private Translation2d velocityVector;
-    private LinearFilter angleFilter;
 
     /*
      * Constructs a
@@ -33,7 +33,6 @@ public class SwerveModule implements Sendable {
         this.state = new SwerveModuleState(0, Rotation2d.fromDegrees(0));
         this.actualAngle = new Rotation2d();
         this.velocityVector = new Translation2d();
-        this.angleFilter = LinearFilter.movingAverage(5);
     }
 
     public SwerveMotor getDriveMotor() {
@@ -132,7 +131,7 @@ public class SwerveModule implements Sendable {
 
     // Returns the total distance traveled by the module's wheel in meters.
     public double getTotalDistance(Distance unit) {
-        return (this.cfg.driveMotor.getPosition(Radians) * this.cfg.getWheelRadius(unit)) / this.cfg.driveGearRatio;
+        return (this.cfg.driveMotor.getPosition(Radians) / this.cfg.driveGearRatio) * this.cfg.getWheelRadius(unit);
         // return this.cfg.driveMotor.getPosition() / (2*Math.PI);
     }
 
@@ -141,7 +140,7 @@ public class SwerveModule implements Sendable {
     }
 
     public void update() {
-        this.actualAngle = new Rotation2d(this.angleFilter.calculate(this.cfg.absoluteEncoder.getAbsolutePosition(Radians)));
+        this.actualAngle = new Rotation2d(this.cfg.absoluteEncoder.getAbsolutePosition(Radians));
         this.actualState = new SwerveModuleState(this.getActualSpeed(MetersPerSecond), this.actualAngle);
 
         if (this.cfg.driveMotor != null) {
@@ -166,7 +165,7 @@ public class SwerveModule implements Sendable {
         private PIDController driveController, pivotController;
         private Translation2d position;
         private double driveGearRatio = 1.0, pivotGearRatio = 1.0;
-        private double wheelDiameter = 0.0;
+        private MutableMeasure<Distance> wheelDiameter = MutableMeasure.zero(Meters);
         private boolean optimize = true;
 
         public SwerveModuleConfig() {
@@ -181,7 +180,7 @@ public class SwerveModule implements Sendable {
             else dst.pivotController = null;
             dst.driveGearRatio = src.driveGearRatio;
             dst.pivotGearRatio = src.pivotGearRatio;
-            dst.wheelDiameter = src.wheelDiameter;
+            dst.wheelDiameter = src.wheelDiameter.mutableCopy();
             dst.optimize = src.optimize;
             return dst;
         }
@@ -207,7 +206,7 @@ public class SwerveModule implements Sendable {
         }
 
         public SwerveModuleConfig wheelDiameter(double diameter, Distance unit) {
-            this.wheelDiameter = Meters.convertFrom(diameter, unit);
+            this.wheelDiameter.mut_replace(diameter, unit);
             return this;
         }
 
@@ -237,15 +236,15 @@ public class SwerveModule implements Sendable {
         }
 
         public double getWheelCircumference(Distance unit) {
-            return unit.convertFrom(this.wheelDiameter, Meters) * Math.PI;
+            return this.wheelDiameter.in(unit) * Math.PI;
         }
 
         public double getWheelDiameter(Distance unit) {
-            return unit.convertFrom(this.wheelDiameter, Meters);
+            return this.wheelDiameter.in(unit);
         }
 
         public double getWheelRadius(Distance unit) {
-            return unit.convertFrom(this.wheelDiameter, Meters) / 2;
+            return this.wheelDiameter.in(unit) / 2;
         }
     }
 
@@ -265,5 +264,6 @@ public class SwerveModule implements Sendable {
         builder.addDoubleProperty("pivotOutput", () -> this.cfg.pivotMotor.get(), null);
         builder.addDoubleProperty("driveOutput", () -> this.cfg.driveMotor.get(), null);
         builder.addDoubleProperty("totalDistance", () -> this.getTotalDistance(Meters), null);
+        builder.addDoubleProperty("rawDistance", () -> MathUtil.inputModulus(this.getDriveMotor().getPosition(Degrees) / this.cfg.driveGearRatio, 0, 360), null);
     }
 }
