@@ -229,6 +229,7 @@ public class SwerveDrive implements Sendable {
         this.driveController.getThetaController().setI(turnController.getI());
         this.driveController.getThetaController().setD(turnController.getD());
         this.driveController.getThetaController().setConstraints(new Constraints(this.maxTurnSpeed, this.maxTurnAccel));
+        this.driveController.setEnabled(false);
     }
 
     public PIDController getGlobalDrivePID() {
@@ -263,17 +264,23 @@ public class SwerveDrive implements Sendable {
         this.trajectory = null;
     }
 
-    public void moveTo(Translation2d pos) {
+    public void moveTo(Translation2d position) {
+        System.out.println(this.maxDriveSpeed);
+        System.out.println();
+
         this.followTrajectory(TrajectoryGenerator.generateTrajectory(
             new Pose2d(new Translation2d(this.getPoseX(Meters), this.getPoseY(Meters)), new Rotation2d(this.getPoseAngle(Radians))), 
             new ArrayList<>(), 
-            new Pose2d(pos, new Rotation2d(this.getPoseAngle(Radians))),
+            new Pose2d(position, new Rotation2d(this.getPoseAngle(Radians))),
             new TrajectoryConfig(this.maxDriveSpeed, this.maxDriveAccel)
+                .setKinematics(this.kinematics)
+                .setStartVelocity(this.getVelocity(MetersPerSecond))
+                .setEndVelocity(0)
         ));
     }
 
-    public void moveBy(Translation2d off) {
-        this.moveTo(this.pose.getTranslation().plus(off));
+    public void moveBy(Translation2d offset) {
+        this.moveTo(this.pose.getTranslation().plus(offset));
     }
 
     public Translation2d getDriveVelocityVector(Velocity<Distance> unit) {
@@ -288,15 +295,19 @@ public class SwerveDrive implements Sendable {
         return unit.convertFrom(this.actualChassisSpeeds.vyMetersPerSecond, MetersPerSecond);
     }
 
+    public double getVelocity(Velocity<Distance> unit) {
+        return Math.hypot(this.getXVelocity(unit), this.getYVelocity(unit));
+    }
+
     public double getTurnVelocity(Velocity<Angle> unit) {
         return unit.convertFrom(this.actualChassisSpeeds.omegaRadiansPerSecond, RadiansPerSecond);
     }
 
     public void update() {
-        if (this.trajectory != null) {
-            var state = this.trajectory.sample(this.pathTimer.get());
+        if (this.trajectory != null) { // are we following a trajcetory
+            var state = this.trajectory.sample(this.pathTimer.get()); // obtain the next trajectory state at the currnt time
             this.speeds = this.driveController.calculate(this.pose, state, new Rotation2d(this.targetHeading.in(Radians)));
-            System.out.println(this.pose.getTranslation());
+            System.out.println(state.velocityMetersPerSecond);
             if (state.timeSeconds >= this.trajectory.getTotalTimeSeconds()) {
                this.cancelTrajectory(); 
             }
@@ -318,14 +329,15 @@ public class SwerveDrive implements Sendable {
         for (int i = 0; i < this.modules.length; i++) {
             this.modules[i].setState(this.wheelStates[i]);
             this.modules[i].update();
-            this.wheelPositions[i] = new SwerveModulePosition(this.modules[i].getTotalDistance(Meters), this.modules[i].getActualAngle());
-            
+            this.wheelPositions[i] = this.modules[i].getActualPosition();
             this.actualWheelStates[i] = this.modules[i].getActualState();
         }
 
-        System.out.println(this.wheelPositions[0].distanceMeters);
-
         this.actualChassisSpeeds = this.kinematics.toChassisSpeeds(this.actualWheelStates);
+
+        // System.out.println("(" + this.pose.getX() + ", " + this.pose.getY() + ")");
+
+        // System.out.println(Math.hypot(this.actualChassisSpeeds.vxMetersPerSecond, this.actualChassisSpeeds.vyMetersPerSecond));
 
         if (this.poseOverriden) {
             this.odometry.resetPosition(

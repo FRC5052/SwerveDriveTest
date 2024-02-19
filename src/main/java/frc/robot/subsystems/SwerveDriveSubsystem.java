@@ -52,25 +52,25 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       new SwerveIMU.NavXSwerveIMU(),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
         .position(new Translation2d(23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kCoast))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(-122.565), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kCoast))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(156.775), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
         .position(new Translation2d(-23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, true, IdleMode.kCoast))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, true, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(126.33), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
         .position(new Translation2d(-23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kCoast))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-6.11), false))
       )
@@ -79,7 +79,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setGlobalDrivePID(new PIDController(0.05, 0.0, 0.0));
     this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
     this.swerveDrive.setDriveController(
-      new PIDController(0.05, 0, 0.0), 
+      new PIDController(0.0, 0, 0.0), 
       new PIDController(5.0, 0.0, 0.2)
     );
     this.swerveDrive.setFieldCentric(true);
@@ -98,7 +98,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   public void moveBy(Translation2d off) {
     this.swerveDrive.setFieldCentric(false);
-    this.swerveDrive.moveBy(off);
+    this.swerveDrive.moveBy(off.times(2));
   }
 
   public void cancelMove() {
@@ -108,14 +108,14 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
-      this.swerveDrive.setMaxDriveSpeed(12.5, MetersPerSecond); // Full drive speed
-      this.swerveDrive.setMaxTurnSpeed(1.0, RotationsPerSecond); // Full turn speed
-      this.swerveDrive.setMaxDriveAccel(1.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxDriveSpeed(4.0, MetersPerSecond); // Full drive speed
+      this.swerveDrive.setMaxTurnSpeed(0.5, RotationsPerSecond); // Full turn speed
+      this.swerveDrive.setMaxDriveAccel(10.0, MetersPerSecondPerSecond);
       this.swerveDrive.setMaxTurnAccel(20.0, RadiansPerSecond.per(Second));
     } else {
-      this.swerveDrive.setMaxDriveSpeed(3.0, MetersPerSecond); // Non-full drive speed
-      this.swerveDrive.setMaxTurnSpeed(1.5, RadiansPerSecond); // Non-full turn speed
-      this.swerveDrive.setMaxDriveAccel(0.5, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxDriveSpeed(1.25, MetersPerSecond); // Non-full drive speed
+      this.swerveDrive.setMaxTurnSpeed(0.25, RotationsPerSecond); // Non-full turn speed
+      this.swerveDrive.setMaxDriveAccel(5.0, MetersPerSecondPerSecond);
       this.swerveDrive.setMaxTurnAccel(10.0, RadiansPerSecond.per(Second));
     }
   }
@@ -136,7 +136,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.drive(
       x, 
       y, 
-      Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3),
+      Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3) * 0.5,
       HeadingControlMode.kHeadingChange
     );
     this.swerveDrive.update();

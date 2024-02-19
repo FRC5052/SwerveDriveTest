@@ -5,6 +5,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import static edu.wpi.first.units.Units.*;
@@ -21,6 +22,7 @@ public class SwerveModule implements Sendable {
     private SwerveModuleConfig cfg;
     private SwerveModuleState state;
     private SwerveModuleState actualState;
+    private SwerveModulePosition actualPosition;
 
     private Rotation2d actualAngle;
     private Translation2d velocityVector;
@@ -82,6 +84,10 @@ public class SwerveModule implements Sendable {
     public SwerveModuleState getActualState() {
         return this.actualState;
     }
+
+    public SwerveModulePosition getActualPosition() {
+        return this.actualPosition;
+    }
     
 
     /**
@@ -142,12 +148,11 @@ public class SwerveModule implements Sendable {
     public void update() {
         this.actualAngle = new Rotation2d(this.cfg.absoluteEncoder.getAbsolutePosition(Radians));
         this.actualState = new SwerveModuleState(this.getActualSpeed(MetersPerSecond), this.actualAngle);
+        this.actualPosition = new SwerveModulePosition(this.getTotalDistance(Meters), this.actualAngle);
 
         if (this.cfg.driveMotor != null) {
-            double drive = this.cfg.driveController != null ? 
-                this.cfg.driveController.calculate(this.getActualSpeed(MetersPerSecond), this.getStateSpeed(MetersPerSecond)) 
-                :
-                this.getStateSpeed(MetersPerSecond) - this.getActualSpeed(MetersPerSecond);
+            
+            double drive = ((this.getStateSpeed(MetersPerSecond) * this.cfg.driveGearRatio) / this.cfg.getWheelRadius(Meters)) / this.cfg.driveMotor.maxSpeed(RadiansPerSecond);
             this.cfg.driveMotor.set(Double.isNaN(drive) ? 0.0 : drive);
         }
         if (this.cfg.pivotMotor != null) {
