@@ -9,11 +9,25 @@ import frc.robot.commands.Autos;
 import frc.robot.subsystems.ExampleSubsystem;
 import frc.robot.subsystems.IntakeAndShooterSubsystem;
 import frc.robot.subsystems.SwerveDriveSubsystem;
-import frc.robot.subsystems.IntakeAndShooterSubsystem.IntakeBallCommand;
+
+import static edu.wpi.first.units.Units.*;
+
+import org.json.simple.JSONObject;
+
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
+import com.pathplanner.lib.commands.PathPlannerAuto;
+import com.pathplanner.lib.path.PathConstraints;
+import com.pathplanner.lib.path.PathPlannerPath;
+
 import edu.wpi.first.cscore.CameraServerJNI.TelemetryKind;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.FunctionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -35,9 +49,14 @@ public class RobotContainer {
   public final SwerveDriveSubsystem m_swerveDriveSubsystem;
   public final IntakeAndShooterSubsystem m_intakeShooterSubsystem;
 
+  private final SendableChooser<Command> autoChooser;
+
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandGenericHID m_driverController =
       new CommandGenericHID(OperatorConstants.kDriverControllerPort);
+
+  private final CommandXboxController m_secondaryController =
+      new CommandXboxController(1);
 
   private static RobotContainer instance;
 
@@ -57,8 +76,14 @@ public class RobotContainer {
       () -> this.m_driverController.getRawAxis(2)
       );
     this.m_intakeShooterSubsystem = new IntakeAndShooterSubsystem();
+    
+    this.autoChooser = AutoBuilder.buildAutoChooser();
 
-   
+    SmartDashboard.putData("autos/autoChooser", this.autoChooser);
+
+    NamedCommands.registerCommand("shoot", new InstantCommand(() -> m_intakeShooterSubsystem.shoot(1.0)) );
+
+    System.out.println(AutoBuilder.getAllAutoNames());
 
     configureBindings();
   }
@@ -79,33 +104,18 @@ public class RobotContainer {
     // cancelling on release.
 
     m_driverController.button(3).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.resetHeading()));
-    m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.moveBy(new Translation2d(1, 0))));
-    m_driverController.button(6).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.cancelMove()));
-    m_driverController.button(2).onTrue(m_intakeShooterSubsystem.getIntakeBallCommand());
-    m_driverController.button(1).whileTrue(new Command() {
-      private long ticks;
-
-      @Override
-      public void initialize() {
-        ticks = 0;
+    // m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.setTrajectory("Test")));
+    // m_driverController.button(6).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.cancelMove()));
+    // m_driverController.button(5).onTrue(m_intakeShooterSubsystem.hold());
+    this.m_intakeShooterSubsystem.setDefaultCommand(m_intakeShooterSubsystem.chargedShoot(() -> {
+      if (m_secondaryController.getLeftTriggerAxis() > 0.1) {
+        return -1.0;
+      } else {
+        return m_secondaryController.getRightTriggerAxis();
       }
+    }));
+    m_driverController.button(1).whileTrue(m_intakeShooterSubsystem.intake(false));
 
-      public double getTime() {
-        return (double)ticks * Robot.kDefaultPeriod; 
-      }
-
-      @Override
-      public void execute() {
-          m_intakeShooterSubsystem.setShooterSpeed(((3.0/2.0) - (3.0 / (2.0 * (getTime() + 1.0)))) * ((1.0 - m_driverController.getRawAxis(3)) / 2));
-          ticks++;
-      }
-
-      @Override
-      public boolean isFinished() {
-          return getTime() >= 1.5;
-      }
-    });
-    m_driverController.button(1).onFalse(m_intakeShooterSubsystem.getShootBallCommand());
 
     m_driverController.button(8).whileTrue(new Command() {
       private boolean on = true;
@@ -114,6 +124,17 @@ public class RobotContainer {
       public void initialize() {
         on = !on;
         System.out.println(on ? "Full speed enabled." : "Full speed disabled.");
+        m_swerveDriveSubsystem.setFullSpeed(on);
+      }
+    });
+
+    m_driverController.button(9).whileTrue(new Command() {
+      private boolean on = true;
+
+      @Override
+      public void initialize() {
+        on = !on;
+        AprilTags.setIdQuery(on ? 4 : 0);
         m_swerveDriveSubsystem.setFullSpeed(on);
       }
     });
@@ -128,12 +149,8 @@ public class RobotContainer {
       }
     });
 
-
-
-    m_driverController.povRight().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.yawBy(Rotation2d.fromDegrees(1.0))));
-    m_driverController.povLeft().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.yawBy(Rotation2d.fromDegrees(-1.0))));
-    m_driverController.povUp().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.pitchBy(Rotation2d.fromDegrees(0.5))));
-    m_driverController.povDown().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.pitchBy(Rotation2d.fromDegrees(-0.5))));
+    m_secondaryController.povUp().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setWristTarget(m_intakeShooterSubsystem.getWristTarget(Degrees) - 0.5, Degrees)));
+    m_secondaryController.povDown().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setWristTarget(m_intakeShooterSubsystem.getWristTarget(Degrees) + 0.5, Degrees)));
   }
 
   /**
@@ -143,6 +160,6 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     // An example command will be run in autonomous
-    return Autos.exampleAuto(m_exampleSubsystem);
+    return new PathPlannerAuto("JustLeave");
   }
 }

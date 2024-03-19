@@ -152,7 +152,7 @@ public class SwerveModule implements Sendable {
 
         if (this.cfg.driveMotor != null) {
             
-            double drive = ((this.getStateSpeed(MetersPerSecond) * this.cfg.driveGearRatio) / this.cfg.getWheelRadius(Meters)) / this.cfg.driveMotor.maxSpeed(RadiansPerSecond);
+            double drive = (((this.getStateSpeed(MetersPerSecond) * this.cfg.driveGearRatio) / this.cfg.getWheelRadius(Meters)) / this.cfg.driveMotor.maxSpeed(RadiansPerSecond));
             this.cfg.driveMotor.set(Double.isNaN(drive) ? 0.0 : drive);
         }
         if (this.cfg.pivotMotor != null) {
