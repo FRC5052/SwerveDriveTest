@@ -23,7 +23,7 @@ import edu.wpi.first.wpilibj2.command.WaitCommand;
 
 public class IntakeAndShooterSubsystem extends SubsystemBase {
   private static final double wristMotorMax = 20.0;
-  private static final double elevatorMax = 29.5;
+  private static final double elevatorMax = 30.0;
 
   private CANSparkMax lowerIntakeMotor;
   private CANSparkMax upperIntakeMotor;
@@ -50,8 +50,8 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
     this.lowerIntakeMotor = new CANSparkMax(14, MotorType.kBrushless);
     this.upperIntakeMotor = new CANSparkMax(13, MotorType.kBrushless);
     this.lowerIntakeMotor.setInverted(true);
-    this.elevatorMotor1 = new CANSparkMax(19, MotorType.kBrushless);
-    this.elevatorMotor2 = new CANSparkMax(18, MotorType.kBrushless);
+    this.elevatorMotor1 = new CANSparkMax(18, MotorType.kBrushless);
+    this.elevatorMotor2 = new CANSparkMax(19, MotorType.kBrushless);
     this.elevatorMotor2.follow(this.elevatorMotor1);
     this.lowerShooterMotor = new CANSparkMax(16, MotorType.kBrushless);
     this.upperShooterMotor = new CANSparkMax(15, MotorType.kBrushless);
@@ -62,15 +62,15 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
   }
 
   private void setWristTargetRaw(double normalPos) {
-    this.targetWristPosition = (1.0 - MathUtil.clamp(normalPos, 0, 1)) * wristMotorMax;
+    this.targetWristPosition = MathUtil.clamp(normalPos, 0, 1) * wristMotorMax;
   }
 
   private double getWristTargetRaw() {
-    return 1.0 - (this.targetWristPosition / wristMotorMax);
+    return this.targetWristPosition / wristMotorMax;
   }
 
   private double getWristPosRaw() {
-    return 1.0 - (this.wristMotor.getEncoder().getPosition() / wristMotorMax);
+    return this.wristMotor.getEncoder().getPosition() / wristMotorMax;
   }
 
   public void setWristTarget(double value, Angle unit) {
@@ -85,8 +85,16 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
     return unit.convertFrom(-(this.getWristPosRaw() * 60) + 30, Degrees);
   }
 
-  private void setElevatorTargetRaw(double target) {
+  public void setElevatorTargetRaw(double target) {
     this.targetElevatorPosition = MathUtil.clamp(target, 0, 1) * elevatorMax;
+  }
+
+  public double getElevatorTargetRaw() {
+    return this.targetElevatorPosition / elevatorMax;
+  }
+
+  public enum ShooterMode {
+    
   }
 
   public void stopEverything() {
@@ -99,11 +107,12 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
   @Override
   public void periodic() {
     // -1.785
-    // this.setElevatorTargetRaw((-Math.cos(2*Math.PI*this.timer.get()) / 4) + 1);
+    // this.setElevatorTargetRaw((-Math.cos(0.25*Math.PI*this.timer.get()) / 1) + 0.5);
+    // this.setElevatorTargetRaw(0.5);
     // System.out.println(this.targetElevatorPosition-this.elevatorMotor1.getEncoder().getPosition());
     // this.wristMotor.set((this.targetWristPosition-this.wristMotor.getEncoder().getPosition()) / wristMotorMax);
 
-    // this.elevatorMotor1.set(-((this.targetElevatorPosition-this.elevatorMotor1.getEncoder().getPosition()) / elevatorMax) * 0.5);
+    // this.elevatorMotor1.set(((this.targetElevatorPosition-this.elevatorMotor1.getEncoder().getPosition()) / elevatorMax));
     // System.out.println(this.wristMotor.getEncoder().getPosition());
   }
 
@@ -281,7 +290,7 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
     return this.holdCommand;
   }
 
-  public static class IntakeCommand extends Command {
+  public static class  IntakeCommand extends Command {
     private IntakeAndShooterSubsystem subsystem;
 
     public IntakeCommand(IntakeAndShooterSubsystem subsystem) {

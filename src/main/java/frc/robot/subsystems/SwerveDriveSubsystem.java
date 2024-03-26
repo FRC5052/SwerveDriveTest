@@ -10,6 +10,7 @@ import java.util.function.DoubleSupplier;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
+import com.pathplanner.lib.util.PIDConstants;
 import com.pathplanner.lib.util.ReplanningConfig;
 import com.revrobotics.CANSparkBase.IdleMode;
 
@@ -19,6 +20,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.AprilTags;
@@ -58,9 +60,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, true, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(28.74), false))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-153.89), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
         .position(new Translation2d(-23.5, -23.5), Inches)
@@ -79,14 +81,16 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setGlobalDrivePID(new PIDController(0.5, 0.0, 0.0));
     this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
     this.swerveDrive.setDriveController(
-      new PIDController(0.0, 0.0, 0.0), 
-      new PIDController(1.0, 0.0, 0.2)
+      new PIDController(5.0, 0.0, 0.0), 
+      new PIDController(3.5, 0.0, 0.2)
     );
     this.swerveDrive.setFieldCentric(true);
     double maxDistance = 0.0;
     for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
       SwerveModule module = this.swerveDrive.getSwerveModule(i);
       module.getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
+      // module.getDriveMotor().setCurrentLimit(40, Amps);
+      module.getPivotMotor().setCurrentLimit(20, Amps);
       double distance = module.getModulePosition().getNorm();
       if (maxDistance < distance) maxDistance = distance;
     }
@@ -95,7 +99,13 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         this.swerveDrive::overridePosition, 
         this.swerveDrive::getActualChassisSpeeds, 
         (ChassisSpeeds speeds) -> this.swerveDrive.drive(speeds, true),
-        new HolonomicPathFollowerConfig(20.0, maxDistance, new ReplanningConfig()),
+        new HolonomicPathFollowerConfig(
+          new PIDConstants(5.0, 0.0, 0.0),
+          new PIDConstants(2.5, 0.0, 0.0),
+          20.0, 
+          maxDistance, 
+          new ReplanningConfig()
+        ),
         () -> {
           var alliance = DriverStation.getAlliance();
           if (alliance.isPresent()) {
@@ -118,15 +128,15 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
-      this.swerveDrive.setMaxDriveSpeed(3.5, MetersPerSecond); // Full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.3, RotationsPerSecond); // Full turn speed
-      this.swerveDrive.setMaxDriveAccel(2.0, MetersPerSecondPerSecond);
-      this.swerveDrive.setMaxTurnAccel(4.0, RotationsPerSecond.per(Second));
+      this.swerveDrive.setMaxDriveSpeed(3.0, MetersPerSecond); // Full drive speed
+      this.swerveDrive.setMaxTurnSpeed(0.1, RotationsPerSecond); // Full turn speed
+      this.swerveDrive.setMaxDriveAccel(1.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(0.5, RotationsPerSecond.per(Second));
     } else {
-      this.swerveDrive.setMaxDriveSpeed(0.5, MetersPerSecond); // Non-full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.25, RotationsPerSecond); // Non-full turn speed
+      this.swerveDrive.setMaxDriveSpeed(1.5, MetersPerSecond); // Non-full drive speed
+      this.swerveDrive.setMaxTurnSpeed(0.15, RotationsPerSecond); // Non-full turn speed
       this.swerveDrive.setMaxDriveAccel(0.5, MetersPerSecondPerSecond);
-      this.swerveDrive.setMaxTurnAccel(1.0, RadiansPerSecond.per(Second));
+      this.swerveDrive.setMaxTurnAccel(0.25, RadiansPerSecond.per(Second));
     }
   }
 
@@ -138,7 +148,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   public void periodic() {
     if (this.targetPose != null) {
       
-    } else {
+    } else if (DriverStation.isTeleopEnabled()) {
       double x = Math.pow(MathUtil.applyDeadband(this.xAxis.getAsDouble(), 0.1), 3);
       double y = Math.pow(MathUtil.applyDeadband(this.yAxis.getAsDouble(), 0.1), 3);
       if (Math.abs(x*x + y*y) > 1.0) {
@@ -149,7 +159,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       this.swerveDrive.drive(
         x, 
         y, 
-        Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.25), 3),
+        Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.40), 3),
         HeadingControlMode.kHeadingChange
       );
     }

@@ -2,8 +2,8 @@
   "version": 1.0,
   "startingPose": {
     "position": {
-      "x": 1.5,
-      "y": 5.5
+      "x": 1.3826715309960145,
+      "y": 5.53650223579517
     },
     "rotation": 0
   },
@@ -14,31 +14,37 @@
         {
           "type": "named",
           "data": {
-            "name": "shoot"
+            "name": "shootCharge"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 1.0
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "shootRelease"
+          }
+        },
+        {
+          "type": "wait",
+          "data": {
+            "waitTime": 0.5
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "shootStop"
           }
         },
         {
           "type": "path",
           "data": {
-            "pathName": "InsideAllThree Middle"
-          }
-        },
-        {
-          "type": "path",
-          "data": {
-            "pathName": "InsideAllThree Lower"
-          }
-        },
-        {
-          "type": "path",
-          "data": {
-            "pathName": "InsideAllThree Upper"
-          }
-        },
-        {
-          "type": "path",
-          "data": {
-            "pathName": "InsideAllThree Leave"
+            "pathName": "ShootHeld"
           }
         }
       ]

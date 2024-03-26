@@ -1,14 +1,32 @@
 {
   "version": 1.0,
-  "startingPose": null,
+  "startingPose": {
+    "position": {
+      "x": 0.787031987758696,
+      "y": 2.2601914533358305
+    },
+    "rotation": 0
+  },
   "command": {
     "type": "sequential",
     "data": {
       "commands": [
         {
+          "type": "named",
+          "data": {
+            "name": "hello"
+          }
+        },
+        {
           "type": "path",
           "data": {
             "pathName": "JustLeave"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "bye"
           }
         }
       ]

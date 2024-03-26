@@ -19,9 +19,12 @@ import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.path.PathPlannerPath;
+import com.pathplanner.lib.util.PPLibTelemetry;
+import com.pathplanner.lib.util.PathPlannerLogging;
 
 import edu.wpi.first.cscore.CameraServerJNI.TelemetryKind;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.Timer;
@@ -32,6 +35,8 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.FunctionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
+import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandGenericHID;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
@@ -48,8 +53,6 @@ public class RobotContainer {
 
   public final SwerveDriveSubsystem m_swerveDriveSubsystem;
   public final IntakeAndShooterSubsystem m_intakeShooterSubsystem;
-
-  private final SendableChooser<Command> autoChooser;
 
   // Replace with CommandPS4Controller or CommandJoystick if needed
   private final CommandGenericHID m_driverController =
@@ -73,17 +76,23 @@ public class RobotContainer {
     this.m_swerveDriveSubsystem = new SwerveDriveSubsystem(
       () -> -this.m_driverController.getRawAxis(1), 
       () -> -this.m_driverController.getRawAxis(0), 
-      () -> this.m_driverController.getRawAxis(2)
+      () -> -this.m_driverController.getRawAxis(2)
       );
     this.m_intakeShooterSubsystem = new IntakeAndShooterSubsystem();
-    
-    this.autoChooser = AutoBuilder.buildAutoChooser();
+  
 
-    SmartDashboard.putData("autos/autoChooser", this.autoChooser);
-
-    NamedCommands.registerCommand("shoot", new InstantCommand(() -> m_intakeShooterSubsystem.shoot(1.0)) );
-
-    System.out.println(AutoBuilder.getAllAutoNames());
+    NamedCommands.registerCommand("shootCharge", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 1.0)) );
+    NamedCommands.registerCommand("shootRelease", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)) );
+    NamedCommands.registerCommand("shootStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0)) );
+    NamedCommands.registerCommand("shoot", new SequentialCommandGroup(
+      new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 1.0)),
+      new WaitCommand(0.5),
+      new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)),
+      new WaitCommand(0.5),
+      new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0))
+    ));
+    NamedCommands.registerCommand("intakeStart", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)));
+    NamedCommands.registerCommand("intakeStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0)));
 
     configureBindings();
   }
@@ -149,8 +158,8 @@ public class RobotContainer {
       }
     });
 
-    m_secondaryController.povUp().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setWristTarget(m_intakeShooterSubsystem.getWristTarget(Degrees) - 0.5, Degrees)));
-    m_secondaryController.povDown().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setWristTarget(m_intakeShooterSubsystem.getWristTarget(Degrees) + 0.5, Degrees)));
+    m_driverController.povUp().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setElevatorTargetRaw(m_intakeShooterSubsystem.getElevatorTargetRaw() + 0.025)));
+    m_driverController.povDown().whileTrue(new RunCommand(() -> m_intakeShooterSubsystem.setElevatorTargetRaw(m_intakeShooterSubsystem.getElevatorTargetRaw() - 0.025)));
   }
 
   /**
@@ -160,6 +169,7 @@ public class RobotContainer {
    */
   public Command getAutonomousCommand() {
     // An example command will be run in autonomous
-    return new PathPlannerAuto("JustLeave");
+    
+    return new PathPlannerAuto("InsideAllThree");
   }
 }

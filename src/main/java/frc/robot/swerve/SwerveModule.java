@@ -270,5 +270,7 @@ public class SwerveModule implements Sendable {
         builder.addDoubleProperty("driveOutput", () -> this.cfg.driveMotor.get(), null);
         builder.addDoubleProperty("totalDistance", () -> this.getTotalDistance(Meters), null);
         builder.addDoubleProperty("rawDistance", () -> MathUtil.inputModulus(this.getDriveMotor().getPosition(Degrees) / this.cfg.driveGearRatio, 0, 360), null);
+        builder.addDoubleProperty("driveOutputCurrent", () -> this.getDriveMotor().getCurrent(Amps), null);
+        builder.addDoubleProperty("pivotOutputCurrent", () -> this.getPivotMotor().getCurrent(Amps), null);
     }
 }
