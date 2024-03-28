@@ -54,27 +54,27 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       new SwerveIMU.NavXSwerveIMU(),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
         .position(new Translation2d(23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, true, IdleMode.kBrake))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(24.7), false))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-70.04), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, true, IdleMode.kBrake))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-153.89), false))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-243.28), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
         .position(new Translation2d(-23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(-52.91), false))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(36.29), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
         .position(new Translation2d(-23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-124.45), false))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-34.1), false))
       )
     );
     this.setFullSpeed(true);
@@ -88,7 +88,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     double maxDistance = 0.0;
     for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
       SwerveModule module = this.swerveDrive.getSwerveModule(i);
-      module.getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
+      // module.getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
       // module.getDriveMotor().setCurrentLimit(40, Amps);
       module.getPivotMotor().setCurrentLimit(20, Amps);
       double distance = module.getModulePosition().getNorm();
@@ -98,7 +98,12 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         this.swerveDrive::getPose, 
         this.swerveDrive::overridePosition, 
         this.swerveDrive::getActualChassisSpeeds, 
-        (ChassisSpeeds speeds) -> this.swerveDrive.drive(speeds, true),
+        (ChassisSpeeds speeds) -> this.swerveDrive.drive(
+          MathUtil.clamp(-speeds.vxMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
+          MathUtil.clamp(-speeds.vyMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
+          MathUtil.clamp(-speeds.omegaRadiansPerSecond/this.swerveDrive.getMaxTurnSpeed(RadiansPerSecond), -1.0, 1.0),
+          HeadingControlMode.kSpeedOnly
+        ),
         new HolonomicPathFollowerConfig(
           new PIDConstants(5.0, 0.0, 0.0),
           new PIDConstants(2.5, 0.0, 0.0),

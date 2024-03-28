@@ -22,6 +22,7 @@ import com.pathplanner.lib.path.PathPlannerPath;
 import com.pathplanner.lib.util.PPLibTelemetry;
 import com.pathplanner.lib.util.PathPlannerLogging;
 
+import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.cscore.CameraServerJNI.TelemetryKind;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -74,25 +75,27 @@ public class RobotContainer {
     instance = this;
 
     this.m_swerveDriveSubsystem = new SwerveDriveSubsystem(
-      () -> -this.m_driverController.getRawAxis(1), 
-      () -> -this.m_driverController.getRawAxis(0), 
+      () -> this.m_driverController.getRawAxis(1), 
+      () -> this.m_driverController.getRawAxis(0), 
       () -> -this.m_driverController.getRawAxis(2)
       );
     this.m_intakeShooterSubsystem = new IntakeAndShooterSubsystem();
   
 
-    NamedCommands.registerCommand("shootCharge", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 1.0)) );
-    NamedCommands.registerCommand("shootRelease", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)) );
-    NamedCommands.registerCommand("shootStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0)) );
+    NamedCommands.registerCommand("shootCharge", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 1.0).schedule()) );
+    NamedCommands.registerCommand("shootRelease", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0).schedule()) );
+    NamedCommands.registerCommand("shootStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0).schedule()) );
     NamedCommands.registerCommand("shoot", new SequentialCommandGroup(
-      new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 1.0)),
+      new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.7)),
       new WaitCommand(0.5),
       new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)),
       new WaitCommand(0.5),
       new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0))
     ));
-    NamedCommands.registerCommand("intakeStart", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0)));
-    NamedCommands.registerCommand("intakeStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0)));
+    NamedCommands.registerCommand("intakeStart", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> -1.0).schedule()));
+    NamedCommands.registerCommand("intakeStop", new InstantCommand(() -> m_intakeShooterSubsystem.chargedShoot(() -> 0.0).schedule()));
+
+    CameraServer.startAutomaticCapture();
 
     configureBindings();
   }
@@ -116,7 +119,7 @@ public class RobotContainer {
     // m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.setTrajectory("Test")));
     // m_driverController.button(6).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.cancelMove()));
     // m_driverController.button(5).onTrue(m_intakeShooterSubsystem.hold());
-    this.m_intakeShooterSubsystem.setDefaultCommand(m_intakeShooterSubsystem.chargedShoot(() -> {
+    m_intakeShooterSubsystem.setDefaultCommand(m_intakeShooterSubsystem.chargedShoot(() -> {
       if (m_secondaryController.getLeftTriggerAxis() > 0.1) {
         return -1.0;
       } else {

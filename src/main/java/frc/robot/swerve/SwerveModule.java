@@ -137,7 +137,7 @@ public class SwerveModule implements Sendable {
 
     // Returns the total distance traveled by the module's wheel in meters.
     public double getTotalDistance(Distance unit) {
-        return (this.cfg.driveMotor.getPosition(Radians) / this.cfg.driveGearRatio) * this.cfg.getWheelRadius(unit);
+        return -(this.cfg.driveMotor.getPosition(Radians) / this.cfg.driveGearRatio) * this.cfg.getWheelRadius(unit);
         // return this.cfg.driveMotor.getPosition() / (2*Math.PI);
     }
 
