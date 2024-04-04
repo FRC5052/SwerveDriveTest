@@ -2,25 +2,19 @@
   "version": 1.0,
   "startingPose": {
     "position": {
-      "x": 0.7911138899200891,
-      "y": 4.331587893945019
+      "x": 0.5996586030261917,
+      "y": 2.3538781457020823
     },
-    "rotation": -59.11069926797429
+    "rotation": 0
   },
   "command": {
     "type": "sequential",
     "data": {
       "commands": [
         {
-          "type": "named",
-          "data": {
-            "name": "shoot"
-          }
-        },
-        {
           "type": "path",
           "data": {
-            "pathName": "JustLeave"
+            "pathName": "JustLeave Alt"
           }
         }
       ]

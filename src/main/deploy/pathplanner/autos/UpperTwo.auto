@@ -2,10 +2,10 @@
   "version": 1.0,
   "startingPose": {
     "position": {
-      "x": 0.7911138899200891,
-      "y": 4.331587893945019
+      "x": 0.82,
+      "y": 6.81805748226881
     },
-    "rotation": -59.11069926797429
+    "rotation": 61.89776686150647
   },
   "command": {
     "type": "sequential",
@@ -20,7 +20,13 @@
         {
           "type": "path",
           "data": {
-            "pathName": "JustLeave"
+            "pathName": "UpperTwo Near"
+          }
+        },
+        {
+          "type": "path",
+          "data": {
+            "pathName": "UpperTwo Far"
           }
         }
       ]

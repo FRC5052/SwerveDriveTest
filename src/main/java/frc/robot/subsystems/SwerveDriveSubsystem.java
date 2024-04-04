@@ -54,9 +54,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       new SwerveIMU.NavXSwerveIMU(),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
         .position(new Translation2d(23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-70.04), false))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
+        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
+        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-240.64), false))
       ),
       new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
@@ -81,7 +81,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setGlobalDrivePID(new PIDController(0.5, 0.0, 0.0));
     this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
     this.swerveDrive.setDriveController(
-      new PIDController(5.0, 0.0, 0.0), 
+      new PIDController(0.8, 0.0, 0.0), 
       new PIDController(3.5, 0.0, 0.2)
     );
     this.swerveDrive.setFieldCentric(true);
@@ -89,8 +89,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
       SwerveModule module = this.swerveDrive.getSwerveModule(i);
       // module.getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
-      // module.getDriveMotor().setCurrentLimit(40, Amps);
-      module.getPivotMotor().setCurrentLimit(20, Amps);
+      module.getDriveMotor().setCurrentLimit(40, Amps);
+      // module.getPivotMotor().setCurrentLimit(20, Amps);
       double distance = module.getModulePosition().getNorm();
       if (maxDistance < distance) maxDistance = distance;
     }
@@ -133,7 +133,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
-      this.swerveDrive.setMaxDriveSpeed(3.0, MetersPerSecond); // Full drive speed
+      this.swerveDrive.setMaxDriveSpeed(4.0, MetersPerSecond); // Full drive speed
       this.swerveDrive.setMaxTurnSpeed(0.1, RotationsPerSecond); // Full turn speed
       this.swerveDrive.setMaxDriveAccel(1.0, MetersPerSecondPerSecond);
       this.swerveDrive.setMaxTurnAccel(0.5, RotationsPerSecond.per(Second));

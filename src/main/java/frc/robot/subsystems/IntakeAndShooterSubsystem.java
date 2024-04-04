@@ -36,14 +36,15 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
   private Timer timer = new Timer();
 
   private ShootCommand shootCommand;
-  private ChargedShootCommand chargedShootCommand;
   private HoldCommand holdCommand;
   private IntakeCommand intakeCommand;
+
+  private double shooterThrottle;
+  private ShooterMode shooterMode = ShooterMode.STOP;
 
   /** Creates a new ExampleSubsystem. */
   public IntakeAndShooterSubsystem() {
     this.shootCommand = new ShootCommand(this);
-    this.chargedShootCommand = new ChargedShootCommand(this);
     this.holdCommand = new HoldCommand(this);
     this.intakeCommand = new IntakeCommand(this);
 
@@ -94,7 +95,9 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
   }
 
   public enum ShooterMode {
-    
+    CHARGE,
+    FIRE,
+    STOP,
   }
 
   public void stopEverything() {
@@ -114,6 +117,41 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
 
     // this.elevatorMotor1.set(((this.targetElevatorPosition-this.elevatorMotor1.getEncoder().getPosition()) / elevatorMax));
     // System.out.println(this.wristMotor.getEncoder().getPosition());
+    switch (this.shooterMode) {
+      case CHARGE:
+        this.upperShooterMotor.set(-this.shooterThrottle);
+        this.lowerShooterMotor.set(this.shooterThrottle);
+        break;
+      case FIRE:
+        this.upperIntakeMotor.set(-this.shooterThrottle);
+        this.lowerIntakeMotor.set(this.shooterThrottle);
+        break;
+      case STOP:
+        this.upperShooterMotor.stopMotor();
+        this.lowerShooterMotor.stopMotor();
+        this.upperIntakeMotor.stopMotor();
+        this.lowerIntakeMotor.stopMotor();
+        break;
+      default:
+        break;
+    }
+  }
+
+  public void setOutput(double throttle, ShooterMode mode) {
+    this.shooterThrottle = throttle;
+    this.shooterMode = mode;
+  }
+
+  public void setOutput(ShooterMode mode) {
+    this.setOutput(0.0, mode);
+  }
+
+  public void setIntake(boolean on) {
+    if (on) {
+      this.lowerIntakeMotor.set(0.4);
+    } else {
+      this.lowerIntakeMotor.stopMotor();
+    }
   }
 
   public static class ShootCommand extends Command {
@@ -170,77 +208,6 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
   public Command shoot(double speed) {
     this.shootCommand.shooterSpeed = MathUtil.clamp(speed, 0.0, 1.0);
     return this.shootCommand;
-  }
-
-  public static class ChargedShootCommand extends Command {
-    private IntakeAndShooterSubsystem subsystem;
-    private DoubleSupplier shooterSpeed;
-    private int stage;
-    private Timer timer;
-
-    public ChargedShootCommand(IntakeAndShooterSubsystem subsystem) {
-      this.subsystem = subsystem;
-      this.timer = new Timer();
-      this.timer.start();
-      addRequirements(this.subsystem);
-    }
-
-    @Override
-    public void initialize() {
-      this.stage = 1;
-    }
-
-    @Override
-    public void execute() {
-      double speed = shooterSpeed.getAsDouble();
-      if (speed < 0) {
-        this.subsystem.upperIntakeMotor.set(-0.25);
-        this.subsystem.lowerIntakeMotor.set(0.25);
-      } else if (speed > 0) {
-        this.subsystem.upperShooterMotor.set(-speed);
-        this.subsystem.lowerShooterMotor.set(speed);
-      } else {
-        this.subsystem.upperShooterMotor.stopMotor();
-        this.subsystem.lowerShooterMotor.stopMotor();
-        this.subsystem.upperIntakeMotor.stopMotor();
-        this.subsystem.lowerIntakeMotor.stopMotor();
-      }
-      // switch (this.stage) {
-      //   case 1:
-      //     if (shooterSpeed.getAsDouble() <= 0) {
-      //       this.stage = 2;
-      //       this.timer.restart();
-      //       break;
-      //     }
-      //     this.subsystem.upperShooterMotor.set(-shooterSpeed.getAsDouble());
-      //     this.subsystem.lowerShooterMotor.set(shooterSpeed.getAsDouble());
-      //     break;
-      //   case 2:
-      //     this.subsystem.upperIntakeMotor.set(-0.4);
-      //     this.subsystem.lowerIntakeMotor.set(0.4);
-      //     if (this.timer.get() > 0.5) {
-      //       this.stage = 3;
-      //     }
-      //     break;
-      //   case 3:
-      //     this.subsystem.upperShooterMotor.stopMotor();
-      //     this.subsystem.lowerShooterMotor.stopMotor();
-      //     this.subsystem.upperIntakeMotor.stopMotor();
-      //     this.subsystem.lowerIntakeMotor.stopMotor();
-      //     this.stage = 0;
-      //     break;
-      // }
-    }
-
-    @Override
-    public boolean isFinished() {
-      return this.stage == 0;
-    }
-  }
-
-  public Command chargedShoot(DoubleSupplier speed) {
-    this.chargedShootCommand.shooterSpeed = speed;
-    return this.chargedShootCommand;
   }
 
   public static class HoldCommand extends Command {
@@ -307,6 +274,7 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
     public void end(boolean interrupted) {
       this.subsystem.lowerIntakeMotor.stopMotor();
     }
+
   }
 
   public Command intake(boolean thenHold) {
