@@ -23,6 +23,7 @@ public class SwerveModule implements Sendable {
     private SwerveModuleState state;
     private SwerveModuleState actualState;
     private SwerveModulePosition actualPosition;
+    private SwerveModulePosition actualDeltaPosition;
 
     private Rotation2d actualAngle;
     private Translation2d velocityVector;
@@ -88,6 +89,10 @@ public class SwerveModule implements Sendable {
     public SwerveModulePosition getActualPosition() {
         return this.actualPosition;
     }
+
+    public SwerveModulePosition getActualDeltaPosition() {
+        return this.actualDeltaPosition;
+    }
     
 
     /**
@@ -148,6 +153,7 @@ public class SwerveModule implements Sendable {
     public void update() {
         this.actualAngle = new Rotation2d(this.cfg.absoluteEncoder.getAbsolutePosition(Radians));
         this.actualState = new SwerveModuleState(this.getActualSpeed(MetersPerSecond), this.actualAngle);
+        this.actualDeltaPosition = new SwerveModulePosition(this.actualPosition != null ? this.getTotalDistance(Meters) - this.actualPosition.distanceMeters : this.getTotalDistance(Meters), this.actualAngle);
         this.actualPosition = new SwerveModulePosition(this.getTotalDistance(Meters), this.actualAngle);
 
         if (this.cfg.driveMotor != null) {

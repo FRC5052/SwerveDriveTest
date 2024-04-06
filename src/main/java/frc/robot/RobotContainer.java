@@ -82,7 +82,7 @@ public class RobotContainer {
     this.m_swerveDriveSubsystem = new SwerveDriveSubsystem(
       () -> this.m_driverController.getRawAxis(1), 
       () -> this.m_driverController.getRawAxis(0), 
-      () -> -this.m_driverController.getRawAxis(2)
+      () -> this.m_driverController.getRawAxis(2)
       );
     this.m_intakeShooterSubsystem = new IntakeAndShooterSubsystem();
   
@@ -126,7 +126,7 @@ public class RobotContainer {
     // cancelling on release.
 
     m_driverController.button(3).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.resetHeading()));
-    // m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.setTrajectory("Test")));
+    m_driverController.button(4).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.setTargetPose(new Pose2d(12.6, 2.5, new Rotation2d(Radians.convertFrom(122.0, Degrees))))));
     // m_driverController.button(6).onTrue(new InstantCommand(() -> m_swerveDriveSubsystem.cancelMove()));
     // m_driverController.button(5).onTrue(m_intakeShooterSubsystem.hold());
 

@@ -9,6 +9,7 @@ import static edu.wpi.first.units.Units.*;
 import java.util.function.DoubleSupplier;
 
 import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
 import com.pathplanner.lib.util.PIDConstants;
 import com.pathplanner.lib.util.ReplanningConfig;
@@ -16,14 +17,17 @@ import com.revrobotics.CANSparkBase.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.AprilTags;
+import frc.robot.Limelight;
 import frc.robot.swerve.SwerveDrive;
 import frc.robot.swerve.SwerveEncoder;
 import frc.robot.swerve.SwerveIMU;
@@ -37,7 +41,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   private DoubleSupplier yAxis;
   private DoubleSupplier rAxis;
 
-  private Pose2d targetPose;
+  private Command pathfindingCommand;
+  private boolean seeingAprilTag;
+  private LinearFilter poseResetFilter = LinearFilter.movingAverage(10);
   /** Creates a new ExampleSubsystem. */
   public SwerveDriveSubsystem(DoubleSupplier xAxis, DoubleSupplier yAxis, DoubleSupplier rAxis) {
     this.xAxis = xAxis;
@@ -102,7 +108,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
           MathUtil.clamp(-speeds.vxMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
           MathUtil.clamp(-speeds.vyMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
           MathUtil.clamp(-speeds.omegaRadiansPerSecond/this.swerveDrive.getMaxTurnSpeed(RadiansPerSecond), -1.0, 1.0),
-          HeadingControlMode.kSpeedOnly
+          HeadingControlMode.kSpeedOnly,
+          false
         ),
         new HolonomicPathFollowerConfig(
           new PIDConstants(5.0, 0.0, 0.0),
@@ -124,7 +131,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   public void resetHeading() {
     this.swerveDrive.zeroHeading();
-    this.swerveDrive.overridePosition(new Pose2d());
+    // this.swerveDrive.overridePosition(new Pose2d());
   }
 
   public SwerveDrive getSwerveDrive() {
@@ -134,9 +141,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
       this.swerveDrive.setMaxDriveSpeed(4.0, MetersPerSecond); // Full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.1, RotationsPerSecond); // Full turn speed
-      this.swerveDrive.setMaxDriveAccel(1.0, MetersPerSecondPerSecond);
-      this.swerveDrive.setMaxTurnAccel(0.5, RotationsPerSecond.per(Second));
+      this.swerveDrive.setMaxTurnSpeed(0.5, RotationsPerSecond); // Full turn speed
+      this.swerveDrive.setMaxDriveAccel(6.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(3.0, RotationsPerSecond.per(Second));
     } else {
       this.swerveDrive.setMaxDriveSpeed(1.5, MetersPerSecond); // Non-full drive speed
       this.swerveDrive.setMaxTurnSpeed(0.15, RotationsPerSecond); // Non-full turn speed
@@ -149,9 +156,34 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setFieldCentric(fieldCentric);
   }
 
+  public void setTargetPose(Pose2d pose) {
+    // this.swerveDrive.overrideTargetHeading(-this.swerveDrive.getPoseAngle(Radians), Radians);
+    this.pathfindingCommand = AutoBuilder.pathfindToPose(
+      pose, 
+      new PathConstraints(
+        this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), 
+        this.swerveDrive.getMaxDriveAccel(MetersPerSecondPerSecond), 
+        this.swerveDrive.getMaxTurnSpeed(RadiansPerSecond), 
+        this.swerveDrive.getMaxTurnAccel(RadiansPerSecond.per(Second))
+      )
+    );
+    this.pathfindingCommand.schedule();
+  }
+
   @Override
   public void periodic() {
-    if (this.targetPose != null) {
+    var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, false);
+    if (aprilTagPose.isPresent() && !this.swerveDrive.getPose().equals(aprilTagPose.get())) {
+      // if (!this.seeingAprilTag) {
+        if (!this.seeingAprilTag) this.poseResetFilter.reset();
+        double filteredAngle = this.poseResetFilter.calculate(aprilTagPose.get().getRotation().getRadians());
+        System.out.println(this.swerveDrive.getPoseAngle(Radians) - filteredAngle);
+        this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(filteredAngle)), false);
+        if (!this.seeingAprilTag) this.swerveDrive.overrideTargetHeading(filteredAngle + (this.swerveDrive.getTargetHeading(Radians) - this.swerveDrive.getPoseAngle(Radians)), Radians);
+      // }
+    }
+    this.seeingAprilTag = aprilTagPose.isPresent();
+    if (this.pathfindingCommand != null && this.pathfindingCommand.isScheduled()) {
       
     } else if (DriverStation.isTeleopEnabled()) {
       double x = Math.pow(MathUtil.applyDeadband(this.xAxis.getAsDouble(), 0.1), 3);
@@ -165,13 +197,11 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         x, 
         y, 
         Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.40), 3),
-        HeadingControlMode.kHeadingChange
+        HeadingControlMode.kSpeedOnly,
+        true
       );
+      this.swerveDrive.setFieldCentric(true);
     }
     this.swerveDrive.update();
-    AprilTags.update();
-    if (AprilTags.getAprilTag() != null && AprilTags.getAprilTag().id != 0) {
-      System.out.println("Apriltag detected: " + AprilTags.getAprilTag().id);
-    }
   }
 }
