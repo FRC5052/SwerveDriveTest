@@ -10,6 +10,8 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.util.Units;
 import static edu.wpi.first.units.Units.*;
 
+import com.pathplanner.lib.util.PIDConstants;
+
 import edu.wpi.first.units.Angle;
 import edu.wpi.first.units.Distance;
 import edu.wpi.first.units.Measure;
@@ -50,21 +52,22 @@ public class SwerveModule implements Sendable {
         return this.cfg.absoluteEncoder;
     }
 
-    public void setDrivePID(PIDController controller, boolean clone) {
-        this.cfg.driveController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
+    public void setDrivePID(PIDConstants constants) {
+        this.cfg.driveController = new PIDController(constants.kP, constants.kI, constants.kD);
     }
 
     public void setDrivePID(PIDController controller) {
-        this.setDrivePID(controller, false);
+        this.cfg.driveController = controller;
     }
 
-    public void setPivotPID(PIDController controller, boolean clone) {
-        this.cfg.pivotController = clone ? new PIDController(controller.getP(), controller.getI(), controller.getD()) : controller;
+    public void setPivotPID(PIDConstants constants) {
+        this.cfg.pivotController = new PIDController(constants.kP, constants.kI, constants.kD);
         this.cfg.pivotController.enableContinuousInput(-0.5, 0.5);
     }
 
     public void setPivotPID(PIDController controller) {
-        this.setPivotPID(controller, false);
+        this.cfg.pivotController = controller;
+        this.cfg.pivotController.enableContinuousInput(-0.5, 0.5);
     }
 
     public void setState(SwerveModuleState state) {

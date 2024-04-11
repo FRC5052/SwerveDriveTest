@@ -9,6 +9,8 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.units.Angle;
 import edu.wpi.first.units.Distance;
+import edu.wpi.first.units.Velocity;
+
 import static edu.wpi.first.units.Units.*;
 
 public class Limelight {
@@ -43,5 +45,17 @@ public class Limelight {
         } else {
             return Optional.empty();
         }
+    }
+
+    public static void setRobotYaw(double angle, double angularVelocity, Angle angleUnit, Velocity<Angle> angularVelocityUnit) {
+        init();
+        limelightTable.getEntry("robot_orientation_set").setDoubleArray(new double[] {
+            Degrees.convertFrom(angle, angleUnit),
+            DegreesPerSecond.convertFrom(angularVelocity, angularVelocityUnit),
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        });
     }
 }

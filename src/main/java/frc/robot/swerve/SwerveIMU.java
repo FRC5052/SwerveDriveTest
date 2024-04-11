@@ -65,17 +65,17 @@ public interface SwerveIMU {
 
         @Override
         public double getHeading(Angle unit) {
-            return unit.convertFrom((double)this.navX.getFusedHeading()-this.navX.getAngleAdjustment(), Degrees);
+            return this.getRawHeading(unit) - this.getHeadingOffset(unit);
         }
 
         @Override
         public double getRawHeading(Angle unit) {
-            return this.getHeading(unit) + this.getHeadingOffset(unit);
+            return unit.convertFrom(-(double)this.navX.getFusedHeading(), Degrees);
         }
 
         @Override
         public double getCompassHeading(Angle unit) {
-            return unit.convertFrom((double)this.navX.getCompassHeading(), Degrees);
+            return unit.convertFrom(-(double)this.navX.getCompassHeading(), Degrees);
         }
 
         @Override
@@ -99,12 +99,12 @@ public interface SwerveIMU {
 
         @Override
         public double getHeadingOffset(Angle unit) {
-            return unit.convertFrom(this.navX.getAngleAdjustment(), Degrees);
+            return unit.convertFrom(-this.navX.getAngleAdjustment(), Degrees);
         }
 
         @Override
         public void setHeadingOffset(double offset, Angle unit) {
-            this.navX.setAngleAdjustment(Degrees.convertFrom(offset, unit));
+            this.navX.setAngleAdjustment(-Degrees.convertFrom(offset, unit));
         }        
     }
 }

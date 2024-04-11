@@ -6,6 +6,7 @@ package frc.robot.subsystems;
 
 import static edu.wpi.first.units.Units.*;
 
+import java.util.Optional;
 import java.util.function.DoubleSupplier;
 
 import com.pathplanner.lib.auto.AutoBuilder;
@@ -43,7 +44,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   private Command pathfindingCommand;
   private boolean seeingAprilTag;
-  private LinearFilter poseResetFilter = LinearFilter.movingAverage(10);
+  private LinearFilter poseResetFilter = LinearFilter.movingAverage(20);
   /** Creates a new ExampleSubsystem. */
   public SwerveDriveSubsystem(DoubleSupplier xAxis, DoubleSupplier yAxis, DoubleSupplier rAxis) {
     this.xAxis = xAxis;
@@ -84,11 +85,11 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       )
     );
     this.setFullSpeed(true);
-    this.swerveDrive.setGlobalDrivePID(new PIDController(0.5, 0.0, 0.0));
-    this.swerveDrive.setGlobalPivotPID(new PIDController(1.0, 0.0, 0.0));
+    this.swerveDrive.setGlobalDrivePID(new PIDConstants(0.5, 0.0, 0.0));
+    this.swerveDrive.setGlobalPivotPID(new PIDConstants(1.0, 0.0, 0.0));
     this.swerveDrive.setDriveController(
       new PIDController(0.8, 0.0, 0.0), 
-      new PIDController(3.5, 0.0, 0.2)
+      new PIDController(2.0, 0.0, 0.2)
     );
     this.swerveDrive.setFieldCentric(true);
     double maxDistance = 0.0;
@@ -109,11 +110,11 @@ public class SwerveDriveSubsystem extends SubsystemBase {
           MathUtil.clamp(-speeds.vyMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
           MathUtil.clamp(-speeds.omegaRadiansPerSecond/this.swerveDrive.getMaxTurnSpeed(RadiansPerSecond), -1.0, 1.0),
           HeadingControlMode.kSpeedOnly,
-          false
+          Optional.of(false)
         ),
         new HolonomicPathFollowerConfig(
           new PIDConstants(5.0, 0.0, 0.0),
-          new PIDConstants(2.5, 0.0, 0.0),
+          new PIDConstants(2.0, 0.0, 0.0),
           20.0, 
           maxDistance, 
           new ReplanningConfig()
@@ -141,14 +142,14 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   public void setFullSpeed(boolean fullSpeed) {
     if (fullSpeed) {
       this.swerveDrive.setMaxDriveSpeed(4.0, MetersPerSecond); // Full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.5, RotationsPerSecond); // Full turn speed
-      this.swerveDrive.setMaxDriveAccel(6.0, MetersPerSecondPerSecond);
-      this.swerveDrive.setMaxTurnAccel(3.0, RotationsPerSecond.per(Second));
+      this.swerveDrive.setMaxTurnSpeed(0.75, RotationsPerSecond); // Full turn speed
+      this.swerveDrive.setMaxDriveAccel(8.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(1.5, RotationsPerSecond.per(Second));
     } else {
-      this.swerveDrive.setMaxDriveSpeed(1.5, MetersPerSecond); // Non-full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.15, RotationsPerSecond); // Non-full turn speed
-      this.swerveDrive.setMaxDriveAccel(0.5, MetersPerSecondPerSecond);
-      this.swerveDrive.setMaxTurnAccel(0.25, RadiansPerSecond.per(Second));
+      this.swerveDrive.setMaxDriveSpeed(2.0, MetersPerSecond); // Non-full drive speed
+      this.swerveDrive.setMaxTurnSpeed(0.375, RotationsPerSecond); // Non-full turn speed
+      this.swerveDrive.setMaxDriveAccel(4.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnAccel(1.5, RotationsPerSecond.per(Second));
     }
   }
 
@@ -172,17 +173,14 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, false);
-    if (aprilTagPose.isPresent() && !this.swerveDrive.getPose().equals(aprilTagPose.get())) {
-      // if (!this.seeingAprilTag) {
-        if (!this.seeingAprilTag) this.poseResetFilter.reset();
-        double filteredAngle = this.poseResetFilter.calculate(aprilTagPose.get().getRotation().getRadians());
-        System.out.println(this.swerveDrive.getPoseAngle(Radians) - filteredAngle);
-        this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(filteredAngle)), false);
-        if (!this.seeingAprilTag) this.swerveDrive.overrideTargetHeading(filteredAngle + (this.swerveDrive.getTargetHeading(Radians) - this.swerveDrive.getPoseAngle(Radians)), Radians);
-      // }
+    if (DriverStation.isEnabled()) {
+      Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualChassisSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
+      var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
+      if (aprilTagPose.isPresent() && !this.seeingAprilTag) {
+          this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(this.swerveDrive.getPoseAngle(Radians))), false);
+      }
+      this.seeingAprilTag = aprilTagPose.isPresent();
     }
-    this.seeingAprilTag = aprilTagPose.isPresent();
     if (this.pathfindingCommand != null && this.pathfindingCommand.isScheduled()) {
       
     } else if (DriverStation.isTeleopEnabled()) {
@@ -197,10 +195,9 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         x, 
         y, 
         Math.pow(MathUtil.applyDeadband(this.rAxis.getAsDouble(), 0.40), 3),
-        HeadingControlMode.kSpeedOnly,
-        true
+        HeadingControlMode.kHeadingChange,
+        Optional.empty()
       );
-      this.swerveDrive.setFieldCentric(true);
     }
     this.swerveDrive.update();
   }
