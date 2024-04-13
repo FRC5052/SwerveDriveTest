@@ -88,8 +88,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive.setGlobalDrivePID(new PIDConstants(0.5, 0.0, 0.0));
     this.swerveDrive.setGlobalPivotPID(new PIDConstants(1.0, 0.0, 0.0));
     this.swerveDrive.setDriveController(
-      new PIDController(0.8, 0.0, 0.0), 
-      new PIDController(2.0, 0.0, 0.2)
+      new PIDConstants(0.8, 0.0, 0.0), 
+      new PIDConstants(2.0, 0.0, 0.2)
     );
     this.swerveDrive.setFieldCentric(true);
     double maxDistance = 0.0;
@@ -104,7 +104,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     AutoBuilder.configureHolonomic(
         this.swerveDrive::getPose, 
         this.swerveDrive::overridePosition, 
-        this.swerveDrive::getActualChassisSpeeds, 
+        this.swerveDrive::getActualSpeeds, 
         (ChassisSpeeds speeds) -> this.swerveDrive.drive(
           MathUtil.clamp(-speeds.vxMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
           MathUtil.clamp(-speeds.vyMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
@@ -174,7 +174,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   @Override
   public void periodic() {
     if (DriverStation.isEnabled()) {
-      Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualChassisSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
+      Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
       var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
       if (aprilTagPose.isPresent() && !this.seeingAprilTag) {
           this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(this.swerveDrive.getPoseAngle(Radians))), false);
