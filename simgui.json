@@ -1,0 +1,28 @@
+{
+  "NTProvider": {
+    "types": {
+      "/FMSInfo": "FMSInfo",
+      "/Shuffleboard/Driver Panel/Auto Chooser": "String Chooser",
+      "/SmartDashboard/field": "Field2d",
+      "/SmartDashboard/swerveDrive/drivePID": "PIDController",
+      "/SmartDashboard/swerveDrive/pivotPID": "PIDController"
+    }
+  },
+  "NetworkTables": {
+    "Retained Values": {
+      "open": false
+    },
+    "Transitory Values": {
+      "open": false
+    }
+  },
+  "NetworkTables Info": {
+    "Server": {
+      "Publishers": {
+        "open": true
+      },
+      "open": true
+    },
+    "visible": true
+  }
+}

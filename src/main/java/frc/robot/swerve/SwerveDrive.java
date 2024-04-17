@@ -238,14 +238,14 @@ public class SwerveDrive implements Sendable {
     public void setGlobalDrivePID(PIDConstants constants) {
         this.moduleDriveController = new PIDController(constants.kP, constants.kI, constants.kD);
         for (int i = 0; i < this.modules.length; i++) {
-            this.modules[i].setDrivePID(constants); 
+            this.modules[i].setDrivePID(Optional.of(constants)); 
         }
     }
 
     public void setGlobalPivotPID(PIDConstants constants) {
         this.modulePivotController = new PIDController(constants.kP, constants.kI, constants.kD);
         for (int i = 0; i < this.modules.length; i++) {
-            this.modules[i].setPivotPID(constants); 
+            this.modules[i].setPivotPID(Optional.of(constants)); 
         }
     }
 
@@ -275,22 +275,15 @@ public class SwerveDrive implements Sendable {
         return this.driveController;
     }
 
-
-
     public void zeroHeading() {
         this.imu.zeroHeading();
         this.targetHeading = this.targetHeading.map((x) -> new Rotation2d());
         this.overridePosition(new Pose2d(new Translation2d(this.pose.getX(), this.pose.getY()), new Rotation2d()));
     }
 
-    public void overridePosition(Pose2d pose, boolean zeroIMU) {
-        this.pose = pose;
-        if (zeroIMU) this.imu.setHeadingOffset(pose.getRotation().getRadians(), Radians);
-        this.poseOverriden = true;
-    }
-
     public void overridePosition(Pose2d pose) {
-        this.overridePosition(pose, false);
+        this.pose = pose;
+        this.poseOverriden = true;
     }
 
     public Translation2d getDriveVelocityVector(Velocity<Distance> unit) {
@@ -328,12 +321,12 @@ public class SwerveDrive implements Sendable {
             System.out.println("Pose was null");
         }
         this.speeds = new ChassisSpeeds(
-            limitAccelAndSpeed(this.targetXSpeed.in(MetersPerSecond), this.speeds.vxMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed.in(MetersPerSecond), this.maxDriveAccel.in(MetersPerSecondPerSecond)),
-            limitAccelAndSpeed(this.targetYSpeed.in(MetersPerSecond), this.speeds.vyMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed.in(MetersPerSecond), this.maxDriveAccel.in(MetersPerSecondPerSecond)), 
-            limitAccelAndSpeed((this.headingControlEnabled && !DriverStation.isAutonomousEnabled() ? 
-                this.driveController.getThetaController().calculate(this.targetHeading.in(Radians) - this.pose.getRotation().getRadians(), 0.0)
+            limitAccelAndSpeed(this.targetSpeeds.vxMetersPerSecond, this.speeds.vxMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed.in(MetersPerSecond), this.maxDriveAccel.in(MetersPerSecondPerSecond)),
+            limitAccelAndSpeed(this.targetSpeeds.vyMetersPerSecond, this.speeds.vyMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed.in(MetersPerSecond), this.maxDriveAccel.in(MetersPerSecondPerSecond)), 
+            limitAccelAndSpeed((this.targetHeading.isPresent() && !DriverStation.isAutonomousEnabled() ? 
+                this.driveController.getThetaController().calculate(this.targetHeading.get().getRadians() - this.pose.getRotation().getRadians(), 0.0)
                 :
-                this.targetRSpeed.in(RadiansPerSecond)
+                this.targetSpeeds.omegaRadiansPerSecond
             ), this.speeds.omegaRadiansPerSecond, Robot.kDefaultPeriod, this.maxTurnSpeed.in(RadiansPerSecond), this.maxTurnAccel.in(RadiansPerSecond.per(Second)))
         );
 
@@ -379,7 +372,7 @@ public class SwerveDrive implements Sendable {
         builder.setSmartDashboardType("SwerveDrive");
         builder.addDoubleProperty("imu/heading", () -> this.getPoseAngle(Degrees), null);
         builder.addDoubleProperty("imu/rawHeading", () -> -this.imu.getRawHeading(Degrees), null);
-        builder.addDoubleProperty("imu/headingSetpoint", () -> -this.targetHeading.in(Degrees), null);
+        builder.addDoubleProperty("imu/headingSetpoint", () -> -this.targetHeading.orElse(new Rotation2d()).getDegrees(), null);
         builder.addDoubleProperty("imu/magneticHeading", () -> this.imu.getCompassHeading(Degrees), null);
         builder.addDoubleProperty("imu/headingOffset", () -> -this.imu.getHeadingOffset(Degrees), (double offset) -> this.imu.setHeadingOffset(-offset, Degrees));
         builder.addDoubleProperty("imu/velocity/x", () -> this.getDriveVelocityVector(MetersPerSecond).getX(), null);

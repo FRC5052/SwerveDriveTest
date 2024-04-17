@@ -59,30 +59,30 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive = new SwerveDrive(
       new Pose2d(), 
       new SwerveIMU.NavXSwerveIMU(),
-      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
+      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
         .position(new Translation2d(23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-240.64), false))
-      ),
-      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
+        .build(),
+      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-243.28), false))
-      ),
-      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
+        .build(),
+      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
         .position(new Translation2d(-23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(36.29), false))
-      ),
-      new SwerveModule(SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
+        .build(),
+      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
         .position(new Translation2d(-23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-34.1), false))
-      )
+        .build()
     );
     this.setFullSpeed(true);
     this.swerveDrive.setGlobalDrivePID(new PIDConstants(0.5, 0.0, 0.0));
@@ -177,7 +177,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
       var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
       if (aprilTagPose.isPresent() && !this.seeingAprilTag) {
-          this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(this.swerveDrive.getPoseAngle(Radians))), false);
+          this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(this.swerveDrive.getPoseAngle(Radians))));
       }
       this.seeingAprilTag = aprilTagPose.isPresent();
     }
