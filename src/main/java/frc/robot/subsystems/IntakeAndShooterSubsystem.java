@@ -15,6 +15,9 @@ import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.units.Angle;
+import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.PneumaticsModuleType;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -56,6 +59,8 @@ public class IntakeAndShooterSubsystem extends SubsystemBase {
     this.elevatorMotor2.follow(this.elevatorMotor1);
     this.lowerShooterMotor = new CANSparkMax(16, MotorType.kBrushless);
     this.upperShooterMotor = new CANSparkMax(15, MotorType.kBrushless);
+    this.lowerShooterMotor.setSmartCurrentLimit(20);
+    this.upperShooterMotor.setSmartCurrentLimit(40);
     this.wristMotor = new CANSparkMax(17, MotorType.kBrushless);
     this.wristMotor.setInverted(true);
     this.wristMotor.setIdleMode(IdleMode.kBrake);

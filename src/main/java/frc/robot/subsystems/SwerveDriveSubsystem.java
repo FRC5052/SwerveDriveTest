@@ -19,6 +19,7 @@ import com.revrobotics.CANSparkBase.IdleMode;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.filter.LinearFilter;
+import edu.wpi.first.math.filter.MedianFilter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -35,6 +36,7 @@ import frc.robot.swerve.SwerveIMU;
 import frc.robot.swerve.SwerveModule;
 import frc.robot.swerve.SwerveMotor;
 import frc.robot.swerve.SwerveDrive.HeadingControlMode;
+import static frc.robot.swerve.SwerveIMU.*;
 
 public class SwerveDriveSubsystem extends SubsystemBase {
   private SwerveDrive swerveDrive;
@@ -44,14 +46,15 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   private Command pathfindingCommand;
   private boolean seeingAprilTag;
-  private LinearFilter poseResetFilter = LinearFilter.movingAverage(20);
+  private MedianFilter poseResetXFilter = new MedianFilter(10);
+  private MedianFilter poseResetYFilter = new MedianFilter(10);
   /** Creates a new ExampleSubsystem. */
   public SwerveDriveSubsystem(DoubleSupplier xAxis, DoubleSupplier yAxis, DoubleSupplier rAxis) {
     this.xAxis = xAxis;
     this.yAxis = yAxis;
     this.rAxis = rAxis;
 
-    SwerveModule.SwerveModuleConfig cfg = new SwerveModule.SwerveModuleConfig()
+    SwerveModule.SwerveModuleBuilder cfg = new SwerveModule.SwerveModuleBuilder()
       .driveGearRatio(6.75)
       .pivotGearRatio(12.8)
       .wheelDiameter(0.1016, Meters)
@@ -59,25 +62,25 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.swerveDrive = new SwerveDrive(
       new Pose2d(), 
       new SwerveIMU.NavXSwerveIMU(),
-      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Right
+      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Front Right
         .position(new Translation2d(23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
+        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
+        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-240.64), false))
         .build(),
-      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Front Left
+      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Front Left
         .position(new Translation2d(23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-243.28), false))
         .build(),
-      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Right
+      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Back Right
         .position(new Translation2d(-23.5, -23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kBrake))
         .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(36.29), false))
         .build(),
-      SwerveModule.SwerveModuleConfig.copyOf(cfg) // Back Left
+      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Back Left
         .position(new Translation2d(-23.5, 23.5), Inches)
         .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
         .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kBrake))
@@ -147,8 +150,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       this.swerveDrive.setMaxTurnAccel(1.5, RotationsPerSecond.per(Second));
     } else {
       this.swerveDrive.setMaxDriveSpeed(2.0, MetersPerSecond); // Non-full drive speed
-      this.swerveDrive.setMaxTurnSpeed(0.375, RotationsPerSecond); // Non-full turn speed
-      this.swerveDrive.setMaxDriveAccel(4.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxTurnSpeed(0.5, RotationsPerSecond); // Non-full turn speed
+      this.swerveDrive.setMaxDriveAccel(8.0, MetersPerSecondPerSecond);
       this.swerveDrive.setMaxTurnAccel(1.5, RotationsPerSecond.per(Second));
     }
   }
@@ -173,14 +176,6 @@ public class SwerveDriveSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    if (DriverStation.isEnabled()) {
-      Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
-      var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
-      if (aprilTagPose.isPresent() && !this.seeingAprilTag) {
-          this.swerveDrive.overridePosition(new Pose2d(aprilTagPose.get().getTranslation(), new Rotation2d(this.swerveDrive.getPoseAngle(Radians))));
-      }
-      this.seeingAprilTag = aprilTagPose.isPresent();
-    }
     if (this.pathfindingCommand != null && this.pathfindingCommand.isScheduled()) {
       
     } else if (DriverStation.isTeleopEnabled()) {
@@ -199,6 +194,18 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         Optional.empty()
       );
     }
+    if (DriverStation.isEnabled()) {
+      Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
+      var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
+      if (aprilTagPose.isPresent() && this.seeingAprilTag) {
+        this.swerveDrive.overridePosition(new Pose2d(this.poseResetXFilter.calculate(aprilTagPose.get().getX()), this.poseResetYFilter.calculate(aprilTagPose.get().getY()), new Rotation2d(this.swerveDrive.getActualHeading(Radians))));
+      } else if (aprilTagPose.isPresent()) {
+        // this.poseResetXFilter.reset();
+        // this.poseResetYFilter.reset();
+      }
+      this.seeingAprilTag = aprilTagPose.isPresent();
+    }
     this.swerveDrive.update();
+    
   }
 }

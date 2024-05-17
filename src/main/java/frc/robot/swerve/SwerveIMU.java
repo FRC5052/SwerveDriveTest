@@ -15,26 +15,36 @@ import edu.wpi.first.wpilibj.I2C;
 import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.SerialPort;
 
-public interface SwerveIMU {
-    /** Returns the 3d rotation of this IMU. */
-    public Rotation3d getRotation();
-    /** Returns the heading of this IMU in the given unit, with heading correction applied. */
-    public double getHeading(Angle unit);
+public abstract class SwerveIMU {
+
+    /** 
+     * Returns the 3D rotation of this IMU.
+     * @return The Rotation3d object representing the 3D rotation this IMU is reporting.
+     */
+    public abstract Rotation3d getRotation();
+
+    /** 
+     * Returns the heading of this IMU in the given unit, with heading correction applied. 
+     * @param unit
+     */
+    public abstract double getHeading(Angle unit);
+
     /** Returns the heading of this IMU in the given unit, without heading correction. */
-    public double getRawHeading(Angle unit);
+    public abstract double getRawHeading(Angle unit);
+
     /** Returns the heading of this IMU relative to the planet's magnetic field (if present), in the given unit. 
      * 
      * Note that on some implementations, the IMU has to be calibrated manually for this function to work correctly.
      */
-    public double getCompassHeading(Angle unit);
-    public Translation3d getWorldAccel(Velocity<Velocity<Distance>> unit);
-    public void calibrate();
-    public void zeroHeading();
-    public double getHeadingOffset(Angle unit);
-    public void setHeadingOffset(double offset, Angle unit);
+    public abstract double getCompassHeading(Angle unit);
+    public abstract Translation3d getWorldAccel(Velocity<Velocity<Distance>> unit);
+    public abstract void calibrate();
+    public abstract void zeroHeading();
+    public abstract double getHeadingOffset(Angle unit);
+    public abstract void setHeadingOffset(double offset, Angle unit);
     // public void syncHeadingToMagnet();
     
-    public class NavXSwerveIMU implements SwerveIMU {
+    public class NavXSwerveIMU extends SwerveIMU {
         private AHRS navX;
 
         public NavXSwerveIMU() {

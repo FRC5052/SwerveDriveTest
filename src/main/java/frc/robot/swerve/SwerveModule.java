@@ -41,7 +41,7 @@ public class SwerveModule implements Sendable {
     /*
      * Constructs a
      */
-    private SwerveModule(SwerveModuleConfig cfg) {
+    private SwerveModule(SwerveModuleBuilder cfg) {
         this.driveMotor = cfg.driveMotor;
         this.pivotMotor = cfg.pivotMotor;
         this.absoluteEncoder = cfg.absoluteEncoder;
@@ -185,7 +185,7 @@ public class SwerveModule implements Sendable {
         }
     }
 
-    public static class SwerveModuleConfig {
+    public static class SwerveModuleBuilder {
         private SwerveMotor driveMotor, pivotMotor;
         private SwerveEncoder absoluteEncoder;
         private Optional<PIDConstants> driveController = Optional.empty(), pivotController = Optional.empty();
@@ -194,12 +194,12 @@ public class SwerveModule implements Sendable {
         private Measure<Distance> wheelDiameter;
         private boolean optimize = true;
 
-        public SwerveModuleConfig() {
+        public SwerveModuleBuilder() {
             
         }
 
-        public static SwerveModuleConfig copyOf(SwerveModuleConfig src) {
-            var dst = new SwerveModuleConfig();
+        public static SwerveModuleBuilder copyOf(SwerveModuleBuilder src) {
+            var dst = new SwerveModuleBuilder();
             if (src.driveController != null) dst.driveController = src.driveController.map((pid) -> new PIDConstants(pid.kP, pid.kI, pid.kP));
             else dst.driveController = null;
             if (src.pivotController != null) dst.pivotController = src.pivotController.map((pid) -> new PIDConstants(pid.kP, pid.kI, pid.kP));
@@ -222,52 +222,52 @@ public class SwerveModule implements Sendable {
             return new SwerveModule(this);
         }
 
-        public SwerveModuleConfig driveMotor(SwerveMotor motor) {
+        public SwerveModuleBuilder driveMotor(SwerveMotor motor) {
             this.driveMotor = motor;
             return this;
         }
 
-        public SwerveModuleConfig pivotMotor(SwerveMotor motor) {
+        public SwerveModuleBuilder pivotMotor(SwerveMotor motor) {
             this.pivotMotor = motor;
             return this;
         }
 
-        public SwerveModuleConfig absoluteEncoder(SwerveEncoder encoder) {
+        public SwerveModuleBuilder absoluteEncoder(SwerveEncoder encoder) {
             this.absoluteEncoder = encoder;
             return this;
         }
 
-        public SwerveModuleConfig position(Translation2d position, Distance unit) {
+        public SwerveModuleBuilder position(Translation2d position, Distance unit) {
             this.position = new Translation2d(unit.toBaseUnits(position.getX()), unit.toBaseUnits(position.getY()));
             return this;
         }
 
-        public SwerveModuleConfig wheelDiameter(double diameter, Distance unit) {
+        public SwerveModuleBuilder wheelDiameter(double diameter, Distance unit) {
             this.wheelDiameter = ImmutableMeasure.ofRelativeUnits(diameter, unit);
             return this;
         }
 
-        public SwerveModuleConfig driveGearRatio(double ratio) {
+        public SwerveModuleBuilder driveGearRatio(double ratio) {
             this.driveGearRatio = ratio;
             return this;
         }
 
-        public SwerveModuleConfig pivotGearRatio(double ratio) {
+        public SwerveModuleBuilder pivotGearRatio(double ratio) {
             this.pivotGearRatio = ratio;
             return this;
         }
 
-        public SwerveModuleConfig drivePID(Optional<PIDConstants> pid) {
+        public SwerveModuleBuilder drivePID(Optional<PIDConstants> pid) {
             this.driveController = pid;
             return this;
         }
 
-        public SwerveModuleConfig pivotPID(Optional<PIDConstants> pid) {
+        public SwerveModuleBuilder pivotPID(Optional<PIDConstants> pid) {
             this.pivotController = pid;
             return this;
         }
 
-        public SwerveModuleConfig optimized(boolean enable) {
+        public SwerveModuleBuilder optimized(boolean enable) {
             this.optimize = enable;
             return this;
         }

@@ -21,9 +21,8 @@ import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
 import edu.wpi.first.units.Angle;
 import edu.wpi.first.units.Distance;
-import edu.wpi.first.units.Measure;
+
 import edu.wpi.first.units.MutableMeasure;
-import edu.wpi.first.units.Unit;
 import edu.wpi.first.units.Velocity;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -51,7 +50,6 @@ public class SwerveDrive implements Sendable {
     private HolonomicDriveController driveController = new HolonomicDriveController(new PIDController(0, 0, 0), new PIDController(0, 0, 0), new ProfiledPIDController(0, 0, 0, new TrapezoidProfile.Constraints(0, 0)));
     private boolean fieldCentric;
     private ChassisSpeeds actualSpeeds = new ChassisSpeeds();
-    private Twist2d actualTwist = new Twist2d();
     private SwerveModuleState[] wheelStates;
     private SwerveModuleState[] actualWheelStates;
     private SwerveModulePosition[] wheelPositions;
@@ -81,7 +79,13 @@ public class SwerveDrive implements Sendable {
             }
         }
     }
- 
+    
+    /**
+     * Constructs a new SwerveDrive object with the given initial pose, imu, and modules.
+     * @param initialPose The Pose2d object representing the positions the robot base is starting at.
+     * @param imu The IMU 
+     * @param modules
+     */
     public SwerveDrive(Pose2d initialPose, SwerveIMU imu, SwerveModule... modules) {
         this.imu = imu;
         this.imu.calibrate();
@@ -193,7 +197,9 @@ public class SwerveDrive implements Sendable {
         return this.targetHeading;
     }
 
-    
+    public double getActualHeading(Angle unit) {
+        return this.imu.getHeading(unit);
+    }
 
     public void drive(double x, double y, double h, HeadingControlMode mode, Optional<Boolean> fieldCentric) {
         x = MathUtil.clamp(x, -1.0, 1.0);
@@ -348,8 +354,6 @@ public class SwerveDrive implements Sendable {
         }
 
         this.actualSpeeds = this.kinematics.toChassisSpeeds(this.actualWheelStates);
-
-        this.actualTwist = this.kinematics.toTwist2d(this.wheelDeltaPositions);
 
         if (this.poseOverriden) {
             this.odometry.resetPosition(
