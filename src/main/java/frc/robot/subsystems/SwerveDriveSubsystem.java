@@ -15,6 +15,7 @@ import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
 import com.pathplanner.lib.util.PIDConstants;
 import com.pathplanner.lib.util.ReplanningConfig;
 import com.revrobotics.CANSparkBase.IdleMode;
+import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
@@ -36,7 +37,9 @@ import frc.robot.swerve.SwerveIMU;
 import frc.robot.swerve.SwerveModule;
 import frc.robot.swerve.SwerveMotor;
 import frc.robot.swerve.SwerveDrive.HeadingControlMode;
-import static frc.robot.swerve.SwerveIMU.*;
+import frc.robot.swerve.SwerveMotor.SparkMaxSwerveMotor;
+import frc.robot.swerve.SwerveEncoder.CANCoderSwerveEncoder;
+import frc.robot.swerve.SwerveIMU.NavXSwerveIMU;
 
 public class SwerveDriveSubsystem extends SubsystemBase {
   private SwerveDrive swerveDrive;
@@ -54,59 +57,60 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     this.yAxis = yAxis;
     this.rAxis = rAxis;
 
-    SwerveModule.SwerveModuleBuilder cfg = new SwerveModule.SwerveModuleBuilder()
-      .driveGearRatio(6.75)
-      .pivotGearRatio(12.8)
-      .wheelDiameter(0.1016, Meters)
-    ;
-    this.swerveDrive = new SwerveDrive(
-      new Pose2d(), 
-      new SwerveIMU.NavXSwerveIMU(),
-      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Front Right
-        .position(new Translation2d(23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(10, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(11, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(12, Rotation2d.fromDegrees(-240.64), false))
-        .build(),
-      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Front Left
-        .position(new Translation2d(23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(1, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(2, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(3, Rotation2d.fromDegrees(-243.28), false))
-        .build(),
-      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Back Right
-        .position(new Translation2d(-23.5, -23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(7, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(8, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(9, Rotation2d.fromDegrees(36.29), false))
-        .build(),
-      SwerveModule.SwerveModuleBuilder.copyOf(cfg) // Back Left
-        .position(new Translation2d(-23.5, 23.5), Inches)
-        .driveMotor(new SwerveMotor.CANSparkMaxSwerveMotor(4, false, IdleMode.kBrake))
-        .pivotMotor(new SwerveMotor.CANSparkMaxSwerveMotor(5, false, IdleMode.kBrake))
-        .absoluteEncoder(new SwerveEncoder.CANCoderSwerveEncoder(6, Rotation2d.fromDegrees(-34.1), false))
-        .build()
-    );
+    SwerveModule.Builder module_cfg = new SwerveModule.Builder()
+      .withDriveGearRatio(6.75)
+      .withPivotGearRatio(12.8)
+      .withWheelDiameter(0.1016, Meters);
+
+    SparkMaxSwerveMotor.Builder motor_cfg = new SparkMaxSwerveMotor.Builder()
+      .withIdleMode(IdleMode.kBrake) 
+      .withMotorType(MotorType.kBrushless)
+      .withCurrentLimit(40, Amps);
+
+    CANCoderSwerveEncoder.Builder encoder_cfg = new CANCoderSwerveEncoder.Builder();
+
+    this.swerveDrive = new SwerveDrive.Builder()
+      .withIMU(new NavXSwerveIMU.Builder().withPort())
+      .withModules(new SwerveModule.Builder[] {
+        module_cfg.clone() // Front Right
+          .withOffset(new Translation2d(23.5, -23.5), Inches)
+          .withDriveMotor(motor_cfg.clone().withID(10))
+          .withPivotMotor(motor_cfg.clone().withID(11))
+          .withAbsoluteEncoder(encoder_cfg.clone().withID(12).withOffset(-240.64, Degrees)),
+        module_cfg.clone() // Front Left
+          .withOffset(new Translation2d(23.5, 23.5), Inches)
+          .withDriveMotor(motor_cfg.clone().withID(1))
+          .withPivotMotor(motor_cfg.clone().withID(2))
+          .withAbsoluteEncoder(encoder_cfg.clone().withID(3).withOffset(-243.28, Degrees)),
+        module_cfg.clone() // Back Right
+          .withOffset(new Translation2d(-23.5, -23.5), Inches)
+          .withDriveMotor(motor_cfg.clone().withID(7))
+          .withPivotMotor(motor_cfg.clone().withID(8))
+          .withAbsoluteEncoder(encoder_cfg.clone().withID(9).withOffset(36.29, Degrees)),
+        module_cfg.clone() // Back Left
+          .withOffset(new Translation2d(-23.5, 23.5), Inches)
+          .withDriveMotor(motor_cfg.clone().withID(4))
+          .withPivotMotor(motor_cfg.clone().withID(5))
+          .withAbsoluteEncoder(encoder_cfg.clone().withID(6).withOffset(-34.1, Degrees))
+      })
+      .withHeadingPID(new PIDConstants(2.0, 0.0, 0.2))
+      .withModuleDrivePID(new PIDConstants(0.5, 0.0, 0.0))
+      .withModulePivotPID(new PIDConstants(1.0, 0.0, 0.0))
+      .withFieldCentric(true)
+      .build();
+
     this.setFullSpeed(true);
-    this.swerveDrive.setGlobalDrivePID(new PIDConstants(0.5, 0.0, 0.0));
-    this.swerveDrive.setGlobalPivotPID(new PIDConstants(1.0, 0.0, 0.0));
-    this.swerveDrive.setDriveController(
-      new PIDConstants(0.8, 0.0, 0.0), 
-      new PIDConstants(2.0, 0.0, 0.2)
-    );
-    this.swerveDrive.setFieldCentric(true);
     double maxDistance = 0.0;
     for (int i = 0; i < this.swerveDrive.getNumSwerveModules(); i++) {
       SwerveModule module = this.swerveDrive.getSwerveModule(i);
       // module.getEncoder().setOffset(MathUtil.inputModulus(this.swerveDrive.getSwerveModule(i).getEncoder().getOffset(Degrees) - 90.0, -180, 180), Degrees);
-      module.getDriveMotor().setCurrentLimit(40, Amps);
       // module.getPivotMotor().setCurrentLimit(20, Amps);
-      double distance = module.getModulePosition().getNorm();
+      double distance = module.getModuleOffset().getNorm();
       if (maxDistance < distance) maxDistance = distance;
     }
     AutoBuilder.configureHolonomic(
         this.swerveDrive::getPose, 
-        this.swerveDrive::overridePosition, 
+        this.swerveDrive::setPose, 
         this.swerveDrive::getActualSpeeds, 
         (ChassisSpeeds speeds) -> this.swerveDrive.drive(
           MathUtil.clamp(-speeds.vxMetersPerSecond/this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), -1.0, 1.0),
@@ -117,8 +121,8 @@ public class SwerveDriveSubsystem extends SubsystemBase {
         ),
         new HolonomicPathFollowerConfig(
           new PIDConstants(5.0, 0.0, 0.0),
-          new PIDConstants(2.0, 0.0, 0.0),
-          20.0, 
+          new PIDConstants(2.0, 0.0, 0.2),
+          this.swerveDrive.getMaxDriveSpeed(MetersPerSecond), 
           maxDistance, 
           new ReplanningConfig()
         ),
@@ -157,7 +161,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
   }
 
   public void setFieldCentric(boolean fieldCentric) {
-    this.swerveDrive.setFieldCentric(fieldCentric);
+    this.swerveDrive.setIsFieldCentric(fieldCentric);
   }
 
   public void setTargetPose(Pose2d pose) {
@@ -181,6 +185,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     } else if (DriverStation.isTeleopEnabled()) {
       double x = Math.pow(MathUtil.applyDeadband(this.xAxis.getAsDouble(), 0.1), 3);
       double y = Math.pow(MathUtil.applyDeadband(this.yAxis.getAsDouble(), 0.1), 3);
+      // Normalize joystick vector.
       if (Math.abs(x*x + y*y) > 1.0) {
         double angle = Math.atan2(y, x);
         x = Math.cos(angle);
@@ -198,10 +203,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
       Limelight.setRobotYaw(this.swerveDrive.getPoseAngle(Radians), this.swerveDrive.getActualSpeeds().omegaRadiansPerSecond, Radians, RadiansPerSecond);
       var aprilTagPose = Limelight.getFieldCentricRobotPose(Meters, true);
       if (aprilTagPose.isPresent() && this.seeingAprilTag) {
-        this.swerveDrive.overridePosition(new Pose2d(this.poseResetXFilter.calculate(aprilTagPose.get().getX()), this.poseResetYFilter.calculate(aprilTagPose.get().getY()), new Rotation2d(this.swerveDrive.getActualHeading(Radians))));
-      } else if (aprilTagPose.isPresent()) {
-        // this.poseResetXFilter.reset();
-        // this.poseResetYFilter.reset();
+        this.swerveDrive.setPose(new Pose2d(this.poseResetXFilter.calculate(aprilTagPose.get().getX()), this.poseResetYFilter.calculate(aprilTagPose.get().getY()), new Rotation2d(this.swerveDrive.getActualHeading(Radians))));
       }
       this.seeingAprilTag = aprilTagPose.isPresent();
     }

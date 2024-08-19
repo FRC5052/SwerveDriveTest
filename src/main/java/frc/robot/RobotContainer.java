@@ -13,8 +13,6 @@ import frc.robot.subsystems.IntakeAndShooterSubsystem.ShooterMode;
 
 import static edu.wpi.first.units.Units.*;
 
-import org.json.simple.JSONObject;
-
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.PathPlannerAuto;
