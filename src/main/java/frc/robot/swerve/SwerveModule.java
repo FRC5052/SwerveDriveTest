@@ -2,12 +2,10 @@ package frc.robot.swerve;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.filter.LinearFilter;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.util.Units;
 import static edu.wpi.first.units.Units.*;
 
 import java.util.Objects;
@@ -18,9 +16,7 @@ import com.pathplanner.lib.util.PIDConstants;
 
 import edu.wpi.first.units.Angle;
 import edu.wpi.first.units.Distance;
-import edu.wpi.first.units.ImmutableMeasure;
 import edu.wpi.first.units.Measure;
-import edu.wpi.first.units.MutableMeasure;
 import edu.wpi.first.units.Velocity;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
@@ -90,7 +86,7 @@ public class SwerveModule implements Sendable {
      */
     public void setPivotPID(Optional<PIDConstants> constants) {
         this.pivotController = constants.map((pid) -> new PIDController(pid.kP, pid.kI, pid.kD));
-        this.pivotController.ifPresent((pid) -> pid.enableContinuousInput(-Math.PI, Math.PI));
+        this.pivotController.ifPresent((pid) -> pid.enableContinuousInput(-0.5, 0.5)); // DO NOT CHANGE THIS TO RADIANS
     }
 
     /**
@@ -108,7 +104,7 @@ public class SwerveModule implements Sendable {
      * @return The radius of the swerve module's wheel, in the given units.
      */
     public double getWheelRadius(Distance unit) {
-        return this.getWheelRadius(unit) / 2.0;
+        return this.getWheelDiameter(unit) / 2.0;
     }
 
     /**
@@ -117,7 +113,7 @@ public class SwerveModule implements Sendable {
      * @return The circumfrence of the swerve module's wheel, in the given units.
      */
     public double getWheelCircumference(Distance unit) {
-        return this.getWheelRadius(unit) * Math.PI;
+        return this.getWheelDiameter(unit) * Math.PI;
     }
 
     /**
@@ -266,7 +262,7 @@ public class SwerveModule implements Sendable {
         }
         if (this.pivotMotor != null) {
             double pivot = this.pivotController.isPresent() ? 
-                this.pivotController.get().calculate(this.getActualAngle().getRadians(), this.getStateAngle().getRadians()) 
+                this.pivotController.get().calculate(this.getActualAngle().getRotations(), this.getStateAngle().getRotations())  // DO NOT CHANGE THIS TO RADIANS
                 :
                 this.getStateAngle().getRotations() - this.getActualAngle().getRotations();
             this.pivotMotor.set(Double.isNaN(pivot) ? 0.0 : pivot);

@@ -422,6 +422,7 @@ public class SwerveDrive implements Sendable {
         this.headingController.setI(constants.kI);
         this.headingController.setD(constants.kD);
         this.headingController.setConstraints(new Constraints(this.maxTurnSpeed, this.maxTurnAccel));
+        this.headingController.enableContinuousInput(-Math.PI, Math.PI);
     }
 
     /**
@@ -543,7 +544,7 @@ public class SwerveDrive implements Sendable {
             SwerveUtil.limitAccelAndSpeed(this.targetSpeeds.vxMetersPerSecond, this.speeds.vxMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed, this.maxDriveAccel),
             SwerveUtil.limitAccelAndSpeed(this.targetSpeeds.vyMetersPerSecond, this.speeds.vyMetersPerSecond, Robot.kDefaultPeriod, this.maxDriveSpeed, this.maxDriveAccel), 
             SwerveUtil.limitAccelAndSpeed((this.targetHeading.isPresent() && !DriverStation.isAutonomousEnabled() ? 
-                this.headingController.calculate(this.targetHeading.get().getRadians() - this.pose.getRotation().getRadians(), 0.0)
+                -this.headingController.calculate(this.pose.getRotation().getRadians(), this.targetHeading.get().getRadians())
                 :
                 this.targetSpeeds.omegaRadiansPerSecond
             ), this.speeds.omegaRadiansPerSecond, Robot.kDefaultPeriod, this.maxTurnSpeed, this.maxTurnAccel)
