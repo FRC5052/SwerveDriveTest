@@ -155,7 +155,7 @@ public class SwerveDriveSubsystem extends SubsystemBase {
     } else {
       this.swerveDrive.setMaxDriveSpeed(2.0, MetersPerSecond); // Non-full drive speed
       this.swerveDrive.setMaxTurnSpeed(0.5, RotationsPerSecond); // Non-full turn speed
-      this.swerveDrive.setMaxDriveAccel(8.0, MetersPerSecondPerSecond);
+      this.swerveDrive.setMaxDriveAccel(6.0, MetersPerSecondPerSecond);
       this.swerveDrive.setMaxTurnAccel(1.5, RotationsPerSecond.per(Second));
     }
   }
